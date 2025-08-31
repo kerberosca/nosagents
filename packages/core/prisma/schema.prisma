@@ -1,0 +1,281 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// AGENTS
+// ========================================
+
+model Agent {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  role        String
+  description String?
+  model       String   @default("qwen2.5:7b")
+  goals       String[] // Array of goals
+  tools       String[] // Array of tool names
+  knowledgePackIds String[] // Array of knowledge pack IDs
+  authorizations Json   // Network, filesystem permissions
+  style       Json?    // Tone, language, personality
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  conversations Conversation[] @relation("AgentConversations")
+  messages     Message[]
+  toolCalls    ToolCall[]
+  memories     Memory[]
+  workflows    WorkflowParticipant[]
+
+  @@map("agents")
+}
+
+// ========================================
+// CONVERSATIONS & MESSAGES
+// ========================================
+
+model Conversation {
+  id        String   @id @default(cuid())
+  title     String?
+  agentId   String
+  userId    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  agent     Agent     @relation("AgentConversations", fields: [agentId], references: [id], onDelete: Cascade)
+  user      User?     @relation("UserConversations", fields: [userId], references: [id], onDelete: SetNull)
+  messages  Message[]
+  toolCalls ToolCall[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  agentId        String?
+  role           String   // user, assistant, system
+  content        String
+  metadata       Json?    // Additional message metadata
+  createdAt      DateTime @default(now())
+
+  // Relations
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  agent         Agent?        @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  toolCalls     ToolCall[]    @relation("MessageToolCalls")
+  
+
+  @@index([conversationId], name: "idx_messages_conversation")
+  @@index([agentId], name: "idx_messages_agent")
+  @@map("messages")
+}
+
+// ========================================
+// TOOLS & TOOL CALLS
+// ========================================
+
+model Tool {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  schema      Json     // JSON Schema for the tool
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  toolCalls   ToolCall[]
+
+  @@map("tools")
+}
+
+model ToolCall {
+  id             String   @id @default(cuid())
+  conversationId String
+  agentId        String?
+  toolId         String
+  name           String   // Tool name at time of call
+  arguments      Json     // Tool arguments
+  result         Json?    // Tool result
+  error          String?  // Error message if failed
+  duration       Int?     // Execution time in ms
+  createdAt      DateTime @default(now())
+
+  // Relations
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  agent         Agent?        @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  tool          Tool          @relation(fields: [toolId], references: [id])
+  message       Message?      @relation("MessageToolCalls", fields: [messageId], references: [id])
+  messageId     String?
+
+  @@index([conversationId], name: "idx_tool_calls_conversation")
+  @@index([agentId], name: "idx_tool_calls_agent")
+  @@map("tool_calls")
+}
+
+// ========================================
+// KNOWLEDGE & RAG
+// ========================================
+
+model KnowledgePack {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  path        String   // File system path
+  version     String   @default("1.0.0")
+  tags        String[] // Array of tags
+  metadata    Json?    // Additional metadata
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  documents   Document[]
+
+  @@map("knowledge_packs")
+}
+
+model Document {
+  id             String   @id @default(cuid())
+  knowledgePackId String
+  source         String   // File path
+  title          String?
+  author         String?
+  content        String   // Document content
+  type           String   // pdf, docx, txt, md, etc.
+  metadata       Json?    // Document metadata
+  embeddings     Float[] // Vector embeddings
+  isIndexed      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  knowledgePack  KnowledgePack @relation(fields: [knowledgePackId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgePackId], name: "idx_documents_knowledge_pack")
+  @@map("documents")
+}
+
+// ========================================
+// MEMORY
+// ========================================
+
+model Memory {
+  id          String   @id @default(cuid())
+  agentId     String
+  type        String   // conversation, fact, experience, knowledge
+  content     String   // Memory content
+  metadata    Json?    // Additional metadata
+  importance  Int      @default(5) // 1-10 importance scale
+  expiresAt   DateTime? // For temporary memories
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, type], name: "idx_memories_agent_type")
+  @@map("memories")
+}
+
+// ========================================
+// WORKFLOWS & ORCHESTRATION
+// ========================================
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  definition  Json     // Workflow definition/steps
+  maxConcurrentExecutions Int @default(1)
+  timeout     Int?     // Timeout in seconds
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  executions  WorkflowExecution[]
+  participants WorkflowParticipant[]
+
+  @@map("workflows")
+}
+
+model WorkflowExecution {
+  id         String   @id @default(cuid())
+  workflowId String
+  status     String   // running, completed, failed, cancelled
+  input      Json?    // Input data
+  output     Json?    // Output data
+  error      String?  // Error message if failed
+  startedAt  DateTime @default(now())
+  completedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId], name: "idx_workflow_executions_workflow")
+  @@map("workflow_executions")
+}
+
+model WorkflowParticipant {
+  id         String   @id @default(cuid())
+  workflowId String
+  agentId    String
+  role       String   // coordinator, executor, observer
+  order      Int      // Execution order
+  createdAt  DateTime @default(now())
+
+  // Relations
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, agentId])
+  @@map("workflow_participants")
+}
+
+// ========================================
+// SYSTEM & LOGS
+// ========================================
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String   // info, warn, error, debug
+  category  String   // system, agent, tool, rag, etc.
+  message   String
+  metadata  Json?    // Additional log data
+  createdAt DateTime @default(now())
+
+  @@index([level, category], name: "idx_system_logs_level_category")
+  @@index([createdAt], name: "idx_system_logs_created_at")
+  @@map("system_logs")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      String   @default("user") // user, admin
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  conversations Conversation[] @relation("UserConversations")
+
+  @@map("users")
+}
+
+

@@ -1,0 +1,45 @@
+id: support-client
+name: Support Client Workflow
+description: Workflow pour le support client avec analyse, recherche et réponse
+entryPoint: analyze-request
+exitConditions:
+  - "Problème résolu"
+  - "Escalade vers support humain"
+  - "Demande d'informations supplémentaires"
+
+steps:
+  - id: analyze-request
+    agentId: support-analyst
+    task: "Analyser la demande du client et déterminer le type de problème"
+    dependencies: []
+    requiredTools: ["rag.search"]
+    expectedOutput: "Classification du problème et priorité"
+
+  - id: search-knowledge
+    agentId: knowledge-agent
+    task: "Rechercher dans la base de connaissances pour des solutions similaires"
+    dependencies: ["analyze-request"]
+    requiredTools: ["rag.search", "rag.answer"]
+    expectedOutput: "Solutions trouvées dans la base de connaissances"
+
+  - id: generate-response
+    agentId: support-writer
+    task: "Générer une réponse appropriée basée sur l'analyse et les solutions trouvées"
+    dependencies: ["analyze-request", "search-knowledge"]
+    requiredTools: []
+    expectedOutput: "Réponse complète et professionnelle"
+
+  - id: technical-escalation
+    agentId: technical-expert
+    task: "Analyser les problèmes techniques complexes si nécessaire"
+    dependencies: ["analyze-request"]
+    requiredTools: ["fs.read", "math.evaluate"]
+    expectedOutput: "Analyse technique détaillée"
+    conditional: "Seulement si le problème est technique complexe"
+
+  - id: final-review
+    agentId: support-manager
+    task: "Réviser la réponse finale et s'assurer de la qualité"
+    dependencies: ["generate-response", "technical-escalation"]
+    requiredTools: []
+    expectedOutput: "Réponse finale approuvée"

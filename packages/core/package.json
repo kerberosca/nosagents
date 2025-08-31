@@ -1,0 +1,32 @@
+{
+  "name": "@elavira/core",
+  "version": "1.0.0",
+  "description": "SDK agents - runtime, planning, tools, memory pour Elavira Agents",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@elavira/config": "workspace:*",
+    "@prisma/client": "^5.7.0",
+    "node-cron": "^3.0.3",
+    "prisma": "^5.7.0",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.0",
+    "tsx": "^4.7.0"
+  }
+}

@@ -1,0 +1,65 @@
+id: document-analysis
+name: Document Analysis Workflow
+description: Workflow pour l'analyse complète de documents avec extraction, analyse et synthèse
+entryPoint: extract-content
+exitConditions:
+  - "Analyse complète terminée"
+  - "Document non lisible"
+  - "Demande d'informations supplémentaires"
+
+steps:
+  - id: extract-content
+    agentId: document-processor
+    task: "Extraire le contenu textuel du document et identifier sa structure"
+    dependencies: []
+    requiredTools: ["fs.read"]
+    expectedOutput: "Contenu extrait et structure identifiée"
+
+  - id: classify-document
+    agentId: document-classifier
+    task: "Classifier le type de document et identifier les domaines abordés"
+    dependencies: ["extract-content"]
+    requiredTools: ["rag.search"]
+    expectedOutput: "Classification du document et domaines identifiés"
+
+  - id: extract-entities
+    agentId: nlp-agent
+    task: "Extraire les entités nommées, dates, chiffres et concepts clés"
+    dependencies: ["extract-content"]
+    requiredTools: []
+    expectedOutput: "Entités extraites et concepts identifiés"
+
+  - id: analyze-sentiment
+    agentId: sentiment-analyzer
+    task: "Analyser le sentiment et le ton du document"
+    dependencies: ["extract-content"]
+    requiredTools: []
+    expectedOutput: "Analyse de sentiment et ton identifié"
+
+  - id: research-context
+    agentId: research-agent
+    task: "Rechercher des informations contextuelles liées au contenu"
+    dependencies: ["classify-document", "extract-entities"]
+    requiredTools: ["rag.search", "rag.answer"]
+    expectedOutput: "Contexte et informations complémentaires"
+
+  - id: generate-summary
+    agentId: content-writer
+    task: "Générer un résumé structuré du document avec les points clés"
+    dependencies: ["extract-content", "classify-document", "extract-entities"]
+    requiredTools: []
+    expectedOutput: "Résumé structuré du document"
+
+  - id: create-insights
+    agentId: insights-analyst
+    task: "Créer des insights et recommandations basés sur l'analyse"
+    dependencies: ["analyze-sentiment", "research-context", "generate-summary"]
+    requiredTools: ["math.evaluate"]
+    expectedOutput: "Insights et recommandations"
+
+  - id: final-report
+    agentId: report-writer
+    task: "Créer un rapport final complet avec toutes les analyses"
+    dependencies: ["generate-summary", "create-insights"]
+    requiredTools: ["fs.write"]
+    expectedOutput: "Rapport d'analyse complet"

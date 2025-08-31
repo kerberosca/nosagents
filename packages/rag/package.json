@@ -1,0 +1,27 @@
+{
+  "name": "@elavira/rag",
+  "version": "1.0.0",
+  "description": "Indexation + recherche RAG avec LanceDB + embeddings Ollama",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit",
+    "test": "node test-rag.js"
+  },
+  "dependencies": {
+    "@elavira/config": "workspace:*",
+    "lancedb": "^0.0.1",
+    "mammoth": "^1.6.0",
+    "node-html-parser": "^6.1.12",
+    "pdf-parse": "^1.1.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/pdf-parse": "^1.1.5",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.0"
+  }
+}

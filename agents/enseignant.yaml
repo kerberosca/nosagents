@@ -1,0 +1,19 @@
+name: Prof
+role: "Agent enseignant qui aide à la création de contenu pédagogique"
+model: "qwen2.5:7b"
+goals:
+  - "Créer des plans de cours adaptés au niveau"
+  - "Générer des exercices et évaluations"
+  - "Expliquer des concepts complexes simplement"
+  - "Adapter le contenu aux besoins spéciaux"
+knowledge_packs: ["enseignement", "pedagogie", "curriculum"]
+tools: ["rag.search", "rag.answer", "fs.write", "math.evaluate"]
+authorizations:
+  network: false
+  filesystem: true
+memory:
+  type: postgres
+  scope: per-agent
+style:
+  tone: "pédagogique"
+  language: "fr-CA"

@@ -1,0 +1,65 @@
+id: research-assistant
+name: Research Assistant Workflow
+description: Workflow pour l'assistance à la recherche avec collecte, analyse et synthèse d'informations
+entryPoint: define-research
+exitConditions:
+  - "Recherche complète terminée"
+  - "Informations insuffisantes"
+  - "Demande de clarification"
+
+steps:
+  - id: define-research
+    agentId: research-planner
+    task: "Définir le périmètre de la recherche et identifier les sources pertinentes"
+    dependencies: []
+    requiredTools: ["rag.search"]
+    expectedOutput: "Plan de recherche et sources identifiées"
+
+  - id: collect-information
+    agentId: data-collector
+    task: "Collecter les informations depuis les sources identifiées"
+    dependencies: ["define-research"]
+    requiredTools: ["rag.search", "rag.answer"]
+    expectedOutput: "Données collectées et organisées"
+
+  - id: validate-sources
+    agentId: fact-checker
+    task: "Valider la fiabilité des sources et vérifier les informations"
+    dependencies: ["collect-information"]
+    requiredTools: ["rag.search"]
+    expectedOutput: "Sources validées et informations vérifiées"
+
+  - id: analyze-data
+    agentId: data-analyst
+    task: "Analyser les données collectées et identifier les patterns"
+    dependencies: ["collect-information", "validate-sources"]
+    requiredTools: ["math.evaluate"]
+    expectedOutput: "Analyse des données et patterns identifiés"
+
+  - id: synthesize-findings
+    agentId: synthesis-writer
+    task: "Synthétiser les résultats et créer des conclusions"
+    dependencies: ["analyze-data"]
+    requiredTools: []
+    expectedOutput: "Synthèse des résultats et conclusions"
+
+  - id: generate-recommendations
+    agentId: recommendations-expert
+    task: "Générer des recommandations basées sur les résultats"
+    dependencies: ["synthesize-findings"]
+    requiredTools: []
+    expectedOutput: "Recommandations et actions suggérées"
+
+  - id: create-presentation
+    agentId: presentation-writer
+    task: "Créer une présentation structurée des résultats"
+    dependencies: ["synthesize-findings", "generate-recommendations"]
+    requiredTools: ["fs.write"]
+    expectedOutput: "Présentation des résultats de recherche"
+
+  - id: quality-review
+    agentId: research-reviewer
+    task: "Réviser la qualité et la cohérence de l'ensemble"
+    dependencies: ["create-presentation"]
+    requiredTools: []
+    expectedOutput: "Rapport de recherche final validé"

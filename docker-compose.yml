@@ -1,0 +1,39 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: elavira
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: elavira
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+
+  web:
+    build: ./apps/web
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DATABASE_URL=postgresql://elavira:password@postgres:5432/elavira?schema=public
+      - POSTGRES_URL=postgresql://elavira:password@postgres:5432/elavira
+      - RAG_DIR=/app/data/vectors
+      - KNOWLEDGE_DIR=/app/data/knowledge
+      - ALLOW_NETWORK=false
+      - NODE_ENV=development
+    volumes:
+      - ./data:/app/data
+      - ./agents:/app/agents
+    ports: ["3000:3000"]
+    depends_on: [ollama, postgres]
+
+volumes:
+  ollama:
+  pgdata:
