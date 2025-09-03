@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Tool, AgentContext } from '@elavira/config';
+import { Tool, AgentContext } from '../types';
 import { Logger } from '../utils/logger';
 
 export abstract class BaseTool {

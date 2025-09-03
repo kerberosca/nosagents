@@ -1,15 +1,17 @@
 import { Agent } from './agent';
-import { Agent as AgentConfig } from '@elavira/config';
+import { Agent as AgentConfig } from '../types';
 import { ModelProvider } from '../models/model-provider';
 import { ToolRegistry } from '../tools/tool-registry';
 import { MemoryManager } from '../memory/memory-manager';
 import { Logger } from '../utils/logger';
+import { Coordinator } from './coordinator';
 
 export class AgentManager {
   private agents: Map<string, Agent> = new Map();
   private modelProvider: ModelProvider;
   private toolRegistry: ToolRegistry;
   private memoryManager: MemoryManager;
+  private coordinator: Coordinator;
   private logger: Logger;
 
   constructor(
@@ -20,6 +22,7 @@ export class AgentManager {
     this.modelProvider = modelProvider;
     this.toolRegistry = toolRegistry;
     this.memoryManager = memoryManager;
+    this.coordinator = new Coordinator(modelProvider, toolRegistry, memoryManager);
     this.logger = new Logger('AgentManager');
   }
 
@@ -32,6 +35,10 @@ export class AgentManager {
     );
 
     this.agents.set(agent.getAgentId(), agent);
+    
+    // Enregistrer l'agent dans le coordinateur
+    this.coordinator.registerAgent(agent);
+    
     this.logger.info(`Agent ${config.name} enregistré avec l'ID ${agent.getAgentId()}`);
     
     return agent;
@@ -43,6 +50,20 @@ export class AgentManager {
 
   getAllAgents(): Agent[] {
     return Array.from(this.agents.values());
+  }
+
+  // Méthodes du coordinateur
+  getCoordinator(): Coordinator {
+    return this.coordinator;
+  }
+
+  async orchestrateWorkflow(
+    workflowId: string,
+    steps: any[],
+    input: any,
+    context: { sessionId: string; userId?: string; metadata: Record<string, any> }
+  ): Promise<any> {
+    return await this.coordinator.orchestrateWorkflow(workflowId, steps, input, context);
   }
 
   async processMessageWithAgent(
@@ -64,41 +85,8 @@ export class AgentManager {
     task: string,
     context: { agentId: string; sessionId: string; userId?: string; metadata: Record<string, any> }
   ): Promise<{ content: string; toolCalls: any[]; thoughts: string[]; metadata: Record<string, any> }> {
-    this.logger.info(`Délégation de ${fromAgentId} vers ${toAgentId}: ${task}`);
-
-    const targetAgent = this.getAgent(toAgentId);
-    if (!targetAgent) {
-      throw new Error(`Agent cible ${toAgentId} non trouvé`);
-    }
-
-    // Créer un nouveau contexte pour la délégation
-    const delegationContext: { agentId: string; sessionId: string; userId?: string; metadata: Record<string, any> } = {
-      ...context,
-      metadata: {
-        ...context.metadata,
-        delegatedFrom: fromAgentId,
-        delegationTask: task,
-        timestamp: new Date().toISOString(),
-      },
-    };
-
-    // Traiter la tâche avec l'agent cible
-    const response = await targetAgent.processMessage(task, delegationContext);
-
-    // Enregistrer la délégation dans la mémoire
-    await this.memoryManager.addMemory({
-      agentId: fromAgentId,
-      type: 'conversation',
-      content: `Délégation vers ${toAgentId}: ${task}`,
-      metadata: {
-        toAgentId,
-        task,
-        response: response.content,
-        timestamp: new Date().toISOString(),
-      },
-    });
-
-    return response;
+    // Utiliser le coordinateur pour la délégation
+    return await this.coordinator.delegateTask(fromAgentId, toAgentId, task, context);
   }
 
   async findBestAgentForTask(
@@ -190,7 +178,7 @@ export class AgentManager {
         name: config.name,
         role: config.role,
         tools: config.tools.length,
-        knowledgePacks: config.knowledge_packs.length,
+        knowledgePacks: config.knowledgePacks.length,
         authorizations: config.authorizations,
       };
     }

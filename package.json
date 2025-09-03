@@ -6,15 +6,27 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "start": "turbo run start",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "type-check": "turbo run type-check",
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate",
-    "db:seed": "turbo run db:seed"
+    "db:seed": "turbo run db:seed",
+    "worker:dev": "pnpm --filter=@elavira/worker dev",
+    "worker:start": "pnpm --filter=@elavira/worker start",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "deploy:prod": "pnpm build && pnpm docker:build && pnpm docker:up",
+    "dev:full": "concurrently \"pnpm docker:up\" \"pnpm worker:dev\" \"pnpm dev\""
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "concurrently": "^8.2.2",
     "eslint": "^8.55.0",
     "ioredis": "^5.7.0",
     "node-fetch": "2",

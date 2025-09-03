@@ -32,7 +32,7 @@ export default function WorkflowsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              Déclenché par une demande de menu, l'Assistant délègue au Chef pour créer un plan de repas personnalisé.
+              Déclenché par une demande de menu, l&apos;Assistant délègue au Chef pour créer un plan de repas personnalisé.
             </div>
             <div className="flex items-center justify-between">
               <div className="flex space-x-1">
@@ -57,16 +57,16 @@ export default function WorkflowsPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Création d'exercice</CardTitle>
+              <CardTitle className="text-lg">Création d&apos;exercice</CardTitle>
               <Badge variant="secondary">Inactif</Badge>
             </div>
             <CardDescription>
-              Assistant → Prof pour la création d'exercices
+              Assistant → Prof pour la création d&apos;exercices
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              L'Assistant reçoit une demande d'exercice et délègue au Prof pour créer du contenu pédagogique adapté.
+              L&apos;Assistant reçoit une demande d&apos;exercice et délègue au Prof pour créer du contenu pédagogique adapté.
             </div>
             <div className="flex items-center justify-between">
               <div className="flex space-x-1">
@@ -95,7 +95,7 @@ export default function WorkflowsPage() {
               <Badge variant="default">Actif</Badge>
             </div>
             <CardDescription>
-              Multi-agents pour l'analyse complexe
+              Multi-agents pour l&apos;analyse complexe
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

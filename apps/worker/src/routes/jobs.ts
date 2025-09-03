@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { JobQueueService } from '../services/job-queue';
-import { JobType, JobRequest } from '../types';
+import { JobType, JobRequest, IJobQueueService } from '../types';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
-export function createJobsRouter(jobQueueService: JobQueueService): Router {
+export function createJobsRouter(jobQueueService: IJobQueueService): Router {
   const router = Router();
 
   // POST /jobs - Créer un nouveau job

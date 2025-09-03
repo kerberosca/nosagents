@@ -1,4 +1,4 @@
-import { Tool } from '@elavira/config';
+import { Tool } from '../types';
 import { BaseTool } from './base-tool';
 import { Logger } from '../utils/logger';
 
@@ -36,6 +36,7 @@ export class ToolRegistry {
       description: tool.getDescription(),
       parameters: {}, // À implémenter selon les besoins
       security: tool.getSecurityConfig(),
+      execute: tool.execute.bind(tool),
     } : undefined;
   }
 

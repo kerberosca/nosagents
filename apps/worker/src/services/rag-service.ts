@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 export class RAGService {
-  private ragManager: RAGManager;
+  private ragManager!: RAGManager;
 
   constructor() {
     this.initializeRAGManager();
@@ -27,12 +27,23 @@ export class RAGService {
       logger.info('RAG service initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize RAG service:', error);
-      throw error;
+      // Ne pas lancer l'erreur, laisser le service continuer sans RAG
+      this.ragManager = null as any;
     }
   }
 
   async indexFile(jobData: RAGIndexingJob): Promise<any> {
     try {
+      if (!this.ragManager) {
+        return {
+          success: false,
+          error: 'RAG service not available',
+          documents: [],
+          duration: 0,
+          timestamp: new Date(),
+        };
+      }
+
       if (!jobData.filePath) {
         throw new Error('File path is required for indexing');
       }
@@ -66,7 +77,7 @@ export class RAGService {
     } catch (error) {
       logger.error('File indexing failed:', {
         filePath: jobData.filePath,
-        error: (error as Error).message,
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -117,10 +128,10 @@ export class RAGService {
         timestamp: new Date(),
       };
     } catch (error) {
-      logger.error('Directory indexing failed:', {
-        directoryPath: jobData.directoryPath,
-        error: (error as Error).message,
-      });
+             logger.error('Directory indexing failed:', {
+         directoryPath: jobData.directoryPath,
+         error: error instanceof Error ? error.message : String(error),
+       });
       throw error;
     }
   }
@@ -146,10 +157,10 @@ export class RAGService {
         timestamp: new Date(),
       };
     } catch (error) {
-      logger.error('RAG search failed:', {
-        query: query.substring(0, 100) + '...',
-        error: (error as Error).message,
-      });
+             logger.error('RAG search failed:', {
+         query: query.substring(0, 100) + '...',
+         error: error instanceof Error ? error.message : String(error),
+       });
       throw error;
     }
   }
@@ -193,10 +204,10 @@ export class RAGService {
         timestamp: new Date(),
       };
     } catch (error) {
-      logger.error('Documents deletion failed:', {
-        documentIds,
-        error: error.message,
-      });
+             logger.error('Documents deletion failed:', {
+         documentIds,
+         error: error instanceof Error ? error.message : String(error),
+       });
       throw error;
     }
   }
@@ -217,7 +228,7 @@ export class RAGService {
         timestamp: new Date(),
       };
     } catch (error) {
-      logger.error('Failed to clear RAG index:', (error as Error));
+             logger.error('Failed to clear RAG index:', error instanceof Error ? error : String(error));
       throw error;
     }
   }

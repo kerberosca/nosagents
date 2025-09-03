@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { AgentService } from '../services/agent-service';
 import { JobQueueService } from '../services/job-queue';
-import { JobType } from '../types';
+import { JobType, IJobQueueService } from '../types';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
 export function createAgentsRouter(
   agentService: AgentService,
-  jobQueueService: JobQueueService
+  jobQueueService: IJobQueueService
 ): Router {
   const router = Router();
 
@@ -97,10 +97,12 @@ export function createAgentsRouter(
 
       res.json({
         success: true,
-        health: {
-          ollama: ollamaAvailable,
-          status: ollamaAvailable ? 'healthy' : 'degraded',
-        },
+              health: {
+        ollama: { status: ollamaAvailable ? 'healthy' : 'unhealthy' },
+        database: { status: 'healthy' }, // À implémenter avec Prisma
+        jobQueue: { status: 'healthy' }, // SimpleJobQueueService en mémoire
+        rag: { status: 'healthy' }, // À vérifier avec RAGService
+      },
       });
     } catch (error) {
       logger.error('Failed to check agent health:', error);

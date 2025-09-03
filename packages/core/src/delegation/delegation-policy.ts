@@ -176,8 +176,8 @@ export class DelegationPolicy {
     analysis: any
   ): boolean {
     const complexity = analysis.complexity || 'moderate';
-    const complexityLevels = { simple: 1, moderate: 2, complex: 3 };
-    const messageComplexity = complexityLevels[complexity] || 2;
+    const complexityLevels: Record<string, number> = { simple: 1, moderate: 2, complex: 3 };
+    const messageComplexity = complexityLevels[complexity as keyof typeof complexityLevels] || 2;
     const threshold = condition.value;
 
     switch (condition.operator) {
@@ -208,11 +208,11 @@ export class DelegationPolicy {
 
     switch (condition.operator) {
       case 'contains':
-        return conditionTools.some(tool => requiredTools.includes(tool));
+        return conditionTools.some((tool: string) => requiredTools.includes(tool));
       
       case 'equals':
-        return conditionTools.every(tool => requiredTools.includes(tool)) &&
-               requiredTools.every(tool => conditionTools.includes(tool));
+        return conditionTools.every((tool: string) => requiredTools.includes(tool)) &&
+               requiredTools.every((tool: string) => conditionTools.includes(tool));
       
       default:
         return false;

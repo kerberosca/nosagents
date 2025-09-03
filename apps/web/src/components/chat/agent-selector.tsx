@@ -22,7 +22,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { useAgents } from '@/lib/hooks';
-import { Agent } from '@elavira/core';
+import { Agent } from '@/lib/types';
 
 export interface AgentSelectorProps {
   selectedAgents: Agent[];
@@ -113,7 +113,7 @@ export function AgentSelector({
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Users className="h-5 w-5" />
-          <h3 className="font-medium">Sélection d'agents</h3>
+          <h3 className="font-medium">Sélection d&apos;agents</h3>
           <Badge variant="secondary">
             {selectedAgents.length}/{maxAgents}
           </Badge>

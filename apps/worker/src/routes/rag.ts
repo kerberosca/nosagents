@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { RAGService } from '../services/rag-service';
 import { JobQueueService } from '../services/job-queue';
-import { JobType } from '../types';
+import { JobType, IJobQueueService } from '../types';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
@@ -37,7 +37,7 @@ const upload = multer({
 
 export function createRAGRouter(
   ragService: RAGService,
-  jobQueueService: JobQueueService
+  jobQueueService: IJobQueueService
 ): Router {
   const router = Router();
 

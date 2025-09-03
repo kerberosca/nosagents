@@ -86,7 +86,6 @@ export function DelegationView({ delegations, activeWorkflow }: DelegationViewPr
     total: delegations.length,
     completed: delegations.filter(d => d.status === 'completed').length,
     failed: delegations.filter(d => d.status === 'failed').length,
-    processing: delegations.filter(d => d.status === 'processing').length,
     pending: delegations.filter(d => d.status === 'pending').length,
     successRate: delegations.length > 0 
       ? Math.round((delegations.filter(d => d.status === 'completed').length / delegations.length) * 100)
@@ -153,47 +152,16 @@ export function DelegationView({ delegations, activeWorkflow }: DelegationViewPr
                 <CardTitle className="text-sm flex items-center space-x-2">
                   <GitBranch className="h-4 w-4" />
                   <span>Workflow: {activeWorkflow.name}</span>
-                  <Badge variant={activeWorkflow.status === 'running' ? 'default' : 'secondary'}>
-                    {activeWorkflow.status}
+                  <Badge variant="secondary">
+                    Actif
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Workflow progress */}
-                <div>
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Étapes</span>
-                    <span>{activeWorkflow.steps.filter(s => s.status === 'completed').length}/{activeWorkflow.steps.length}</span>
-                  </div>
-                  <Progress value={activeWorkflow.progress} />
+                <div className="text-sm text-gray-600">
+                  <p>Description: {activeWorkflow.description}</p>
+                  <p className="mt-2">Agents: {activeWorkflow.agents.join(', ')}</p>
                 </div>
-
-                {/* Current step */}
-                {activeWorkflow.currentStep && (
-                  <div className="text-sm">
-                    <span className="text-gray-600">Étape actuelle:</span>
-                    <div className="font-medium mt-1">{activeWorkflow.currentStep}</div>
-                  </div>
-                )}
-
-                {/* Workflow steps */}
-                {showDetails && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-medium text-gray-700">Étapes:</h4>
-                    {activeWorkflow.steps.map((step, index) => (
-                      <div
-                        key={step.id}
-                        className="flex items-center space-x-2 text-xs"
-                      >
-                        {getStatusIcon(step.status)}
-                        <span className="flex-1">{step.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {step.agentId}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
@@ -240,20 +208,9 @@ export function DelegationView({ delegations, activeWorkflow }: DelegationViewPr
                           
                           <div className="flex items-center justify-between text-xs text-gray-500">
                             <span>{formatTime(delegation.timestamp)}</span>
-                            {delegation.confidence && (
-                              <span>Confiance: {Math.round(delegation.confidence * 100)}%</span>
-                            )}
                           </div>
 
-                          {/* Response preview */}
-                          {showDetails && delegation.response && (
-                            <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                              <div className="font-medium mb-1">Réponse:</div>
-                              <p className="text-gray-600 line-clamp-2">
-                                {delegation.response}
-                              </p>
-                            </div>
-                          )}
+                          {/* Response preview - Temporairement désactivé */}
                         </div>
                       </div>
                     </CardContent>
@@ -280,7 +237,7 @@ export function DelegationView({ delegations, activeWorkflow }: DelegationViewPr
                   </div>
                   <div className="flex justify-between">
                     <span>En cours:</span>
-                    <span className="font-medium text-blue-600">{stats.processing}</span>
+                    <span className="font-medium text-blue-600">0</span>
                   </div>
                   <div className="flex justify-between">
                     <span>En attente:</span>

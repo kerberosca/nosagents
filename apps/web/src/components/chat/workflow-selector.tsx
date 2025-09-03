@@ -104,12 +104,8 @@ export function WorkflowSelector({ onWorkflowSelect, activeWorkflow }: WorkflowS
     const workflowInfo: WorkflowInfo = {
       id: workflow.id,
       name: workflow.name,
-      status: 'idle',
-      progress: 0,
-      steps: workflow.steps.map((step: any) => ({
-        ...step,
-        status: 'pending' as const
-      }))
+      description: workflow.description || 'Workflow prédéfini',
+      agents: workflow.agents || []
     };
     
     onWorkflowSelect(workflowInfo);
@@ -314,22 +310,10 @@ export function WorkflowSelector({ onWorkflowSelect, activeWorkflow }: WorkflowS
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span>Statut:</span>
-              <Badge variant={activeWorkflow.status === 'running' ? 'default' : 'secondary'}>
-                {activeWorkflow.status}
-              </Badge>
+            <div className="text-xs text-gray-600">
+              <p>Description: {activeWorkflow.description}</p>
+              <p className="mt-2">Agents: {activeWorkflow.agents.join(', ')}</p>
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <span>Progression:</span>
-              <span>{Math.round(activeWorkflow.progress)}%</span>
-            </div>
-            {activeWorkflow.currentStep && (
-              <div className="text-xs">
-                <span className="text-gray-600">Étape actuelle:</span>
-                <div className="font-medium mt-1">{activeWorkflow.currentStep}</div>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}

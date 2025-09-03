@@ -1,4 +1,4 @@
-import { Dashboard } from '@/components/dashboard/dashboard'
+import { Dashboard } from '../components/dashboard/dashboard'
 
 export default function HomePage() {
   return (
@@ -6,7 +6,7 @@ export default function HomePage() {
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">
-          Vue d'ensemble de votre plateforme Elavira Agents
+          Vue d&apos;ensemble de votre plateforme Elavira Agents
         </p>
       </div>
       <Dashboard />

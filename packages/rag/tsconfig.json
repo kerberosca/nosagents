@@ -12,8 +12,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "incremental": true,
+    "declaration": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "baseUrl": "src",
+    "paths": {
+      "@elavira/config": ["../config/src"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules"]

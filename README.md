@@ -12,11 +12,13 @@ Une plateforme d'agents IA spécialisés, 100% locale et open-source, pour crée
 - 🤖 **Agents IA spécialisés** - Créez et configurez des agents avec des rôles spécifiques
 - 🔍 **Système RAG intégré** - Indexation et recherche de documents avec LanceDB
 - 🎯 **Orchestration multi-agents** - Collaboration et délégation entre agents
+- 🚀 **Coordinateur intelligent** - Gestion automatique des workflows et délégations
 - 🌐 **Interface web moderne** - Interface utilisateur intuitive avec Next.js 15
 - 🔒 **100% local** - Fonctionne entièrement hors ligne avec Ollama
 - 📊 **Base de données robuste** - PostgreSQL avec Prisma ORM
 - 🚀 **Architecture modulaire** - Monorepo TypeScript avec Turborepo
 - 🛡️ **Sécurité granulaire** - Permissions par agent et par outil
+- 🔄 **Fallback automatique** - Basculement intelligent entre modèles IA
 
 ## 🏗️ Architecture
 

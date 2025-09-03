@@ -1,4 +1,5 @@
 import { Agent, AgentMessage, AgentResponse, ToolCall } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 import { ModelProvider } from '../models/model-provider';
 import { ToolRegistry } from '../tools/tool-registry';
 import { MemoryManager } from '../memory/memory-manager';
@@ -164,7 +165,8 @@ export class Coordinator {
       to: targetAgentId,
       message: message,
       response: response,
-      timestamp: new Date()
+      timestamp: new Date(),
+      success: true
     });
 
     return response;
@@ -266,11 +268,23 @@ export class Coordinator {
     const context = this.getOrCreateContext(conversationId);
     
     // Utiliser le modèle du coordinateur
-    const response = await this.modelProvider.generateResponse(
-      this.config.model,
-      message,
-      context.getSharedContext()
+    const modelResponse = await this.modelProvider.generateResponse(
+      message.content,
+      this.config.model
     );
+
+    // Convertir ModelResponse en AgentResponse
+    const response: AgentResponse = {
+      id: uuidv4(),
+      content: modelResponse.content,
+      toolCalls: modelResponse.toolCalls?.map(tc => ({
+        id: uuidv4(),
+        name: tc.name,
+        arguments: tc.arguments
+      })),
+      metadata: modelResponse.metadata,
+      timestamp: new Date()
+    };
 
     // Mettre à jour le contexte
     context.addMessage(message, response);
@@ -296,9 +310,8 @@ Provide your analysis as JSON.
 `;
 
     const analysis = await this.modelProvider.generateResponse(
-      this.config.model,
-      { content: analysisPrompt, role: 'user' },
-      {}
+      analysisPrompt,
+      this.config.model
     );
 
     try {
@@ -333,18 +346,19 @@ Provide a comprehensive response that combines all the results.
 `;
 
     const synthesis = await this.modelProvider.generateResponse(
-      this.config.model,
-      { content: synthesisPrompt, role: 'user' },
-      {}
+      synthesisPrompt,
+      this.config.model
     );
 
     return {
+      id: uuidv4(),
       content: `🤖 **Workflow ${workflow.name} terminé**\n\n${synthesis.content}`,
       metadata: {
         workflowId: workflow.id,
         stepsCompleted: Array.from(results.keys()),
         originalMessage: originalMessage
-      }
+      },
+      timestamp: new Date()
     };
   }
 

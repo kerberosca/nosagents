@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool';
-import { Tool } from '@elavira/config';
+import { Tool } from '../types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 

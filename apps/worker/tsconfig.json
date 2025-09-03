@@ -16,7 +16,9 @@
     "rootDir": "./src",
     "baseUrl": "./src",
     "paths": {
-      "@/*": ["*"]
+      "@elavira/config": ["../../packages/config/src"],
+      "@elavira/core": ["../../packages/core/src"],
+      "@elavira/rag": ["../../packages/rag/src"]
     }
   },
   "include": ["src/**/*"],

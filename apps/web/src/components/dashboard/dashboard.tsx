@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Bot, BookOpen, MessageSquare, Activity, AlertCircle, CheckCircle } from 'lucide-react'
-import { useAgents, useRAG, useJobs } from '@/lib/hooks'
+import { useAgents, useRAG, useJobs } from '../../lib/hooks'
 
 export function Dashboard() {
   const { stats: agentStats, health: agentHealth, getStats: getAgentStats, checkHealth } = useAgents()
@@ -13,14 +13,28 @@ export function Dashboard() {
 
   useEffect(() => {
     const loadStats = async () => {
+      console.log('🔄 Dashboard: Chargement des statistiques...')
       setIsLoading(true)
-      await Promise.all([
-        getAgentStats(),
-        getRAGStats(),
-        getJobStats(),
-        checkHealth()
-      ])
-      setIsLoading(false)
+      
+      try {
+        console.log('📊 Dashboard: Appel de getAgentStats()')
+        await getAgentStats()
+        
+        console.log('📊 Dashboard: Appel de getRAGStats()')
+        await getRAGStats()
+        
+        console.log('📊 Dashboard: Appel de getJobStats()')
+        await getJobStats()
+        
+        console.log('🏥 Dashboard: Appel de checkHealth()')
+        await checkHealth()
+        
+        console.log('✅ Dashboard: Toutes les statistiques chargées')
+      } catch (error) {
+        console.error('❌ Dashboard: Erreur lors du chargement:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
 
     loadStats()
@@ -57,18 +71,23 @@ export function Dashboard() {
     },
   ]
 
+  // Fonction simple pour obtenir le statut d'un service
   const getServiceStatus = (service: string) => {
-    if (!agentHealth) return { status: 'unknown', text: 'Inconnu', color: 'bg-gray-100 text-gray-800' }
-    
-    const health = agentHealth[service]
-    if (health?.status === 'healthy') {
-      return { status: 'online', text: 'En ligne', color: 'bg-green-100 text-green-800' }
-    } else if (health?.status === 'unhealthy') {
-      return { status: 'offline', text: 'Hors ligne', color: 'bg-red-100 text-red-800' }
-    } else {
-      return { status: 'unknown', text: 'Inconnu', color: 'bg-gray-100 text-gray-800' }
+    if (!agentHealth || !agentHealth[service]) {
+      return { text: 'Inconnu', color: 'bg-gray-100 text-gray-800' };
     }
-  }
+    
+    const health = agentHealth[service];
+    if (health.status === 'healthy') {
+      return { text: 'En ligne', color: 'bg-green-100 text-green-800' };
+    } else if (health.status === 'unhealthy') {
+      return { text: 'Hors ligne', color: 'bg-red-100 text-red-800' };
+    } else {
+      return { text: 'Inconnu', color: 'bg-gray-100 text-gray-800' };
+    }
+  };
+
+  console.log('🔄 Dashboard - agentHealth:', agentHealth);
 
   return (
     <div className="space-y-6">
@@ -105,30 +124,30 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Ollama</span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getServiceStatus('ollama').color}`}>
-                  {getServiceStatus('ollama').text}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">PostgreSQL</span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getServiceStatus('database').color}`}>
-                  {getServiceStatus('database').text}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">LanceDB</span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getServiceStatus('lancedb').color}`}>
-                  {getServiceStatus('lancedb').text}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Worker API</span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getServiceStatus('worker').color}`}>
-                  {getServiceStatus('worker').text}
-                </span>
-              </div>
+                             <div className="flex items-center justify-between">
+                 <span className="text-sm font-medium">Ollama</span>
+                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getServiceStatus('ollama').color}`}>
+                   {getServiceStatus('ollama').text}
+                 </span>
+               </div>
+               <div className="flex items-center justify-between">
+                 <span className="text-sm font-medium">PostgreSQL</span>
+                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getServiceStatus('database').color}`}>
+                   {getServiceStatus('database').text}
+                 </span>
+               </div>
+               <div className="flex items-center justify-between">
+                 <span className="text-sm font-medium">Job Queue</span>
+                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getServiceStatus('jobQueue').color}`}>
+                   {getServiceStatus('jobQueue').text}
+                 </span>
+               </div>
+               <div className="flex items-center justify-between">
+                 <span className="text-sm font-medium">RAG Service</span>
+                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getServiceStatus('rag').color}`}>
+                   {getServiceStatus('rag').text}
+                 </span>
+               </div>
             </div>
           </CardContent>
         </Card>

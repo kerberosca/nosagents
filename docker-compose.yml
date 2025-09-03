@@ -1,3 +1,4 @@
+
 version: "3.9"
 services:
   postgres:
@@ -10,6 +11,13 @@ services:
     ports: ["5432:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    volumes:
+      - redis_data:/data
 
   ollama:
     image: ollama/ollama:latest
@@ -27,13 +35,27 @@ services:
       - RAG_DIR=/app/data/vectors
       - KNOWLEDGE_DIR=/app/data/knowledge
       - ALLOW_NETWORK=false
-      - NODE_ENV=development
+      - NODE_ENV=production
     volumes:
       - ./data:/app/data
       - ./agents:/app/agents
     ports: ["3000:3000"]
     depends_on: [ollama, postgres]
 
+  worker:
+    build: ./apps/worker
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DATABASE_URL=postgresql://elavira:password@postgres:5432/elavira?schema=public
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+      - ./agents:/app/agents
+    ports: ["3001:3001"]
+    depends_on: [ollama, postgres, redis]
+
 volumes:
   ollama:
   pgdata:
+  redis_data:

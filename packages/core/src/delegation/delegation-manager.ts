@@ -1,4 +1,5 @@
 import { Agent, AgentMessage, AgentResponse } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 import { ModelProvider } from '../models/model-provider';
 import { ToolRegistry } from '../tools/tool-registry';
 import { MemoryManager } from '../memory/memory-manager';
@@ -159,11 +160,23 @@ Réponds de manière professionnelle et en te concentrant sur ton expertise. Si 
     this.validateAgentPermissions(agent, message);
 
     // Générer la réponse avec le modèle de l'agent
-    const response = await this.modelProvider.generateResponse(
-      agent.model,
-      message,
-      this.getAgentContext(agent, message)
+    const modelResponse = await this.modelProvider.generateResponse(
+      message.content,
+      agent.model
     );
+
+    // Convertir ModelResponse en AgentResponse
+    const response: AgentResponse = {
+      id: uuidv4(),
+      content: modelResponse.content,
+      toolCalls: modelResponse.toolCalls?.map(tc => ({
+        id: uuidv4(),
+        name: tc.name,
+        arguments: tc.arguments
+      })),
+      metadata: modelResponse.metadata,
+      timestamp: new Date()
+    };
 
     // Appliquer les outils si nécessaire
     const responseWithTools = await this.applyAgentTools(agent, message, response);
@@ -297,7 +310,7 @@ Réponds de manière professionnelle et en te concentrant sur ton expertise. Si 
             };
           }
 
-          const result = await tool.execute(toolCall.arguments);
+          const result = await tool.execute(toolCall.arguments, this.getAgentContext(agent, message));
           return {
             name: toolCall.name,
             success: true,

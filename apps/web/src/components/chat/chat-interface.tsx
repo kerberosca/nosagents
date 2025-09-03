@@ -1,12 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Bot, Send, Settings, MessageSquare, AlertCircle } from 'lucide-react'
-import { useAgents, useChat } from '@/lib/hooks'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Badge } from '../ui/badge'
+import { AlertCircle, Send, Bot } from 'lucide-react'
+import { useChat, useAgents } from '../../lib/hooks'
+import type { Agent, AgentMessage } from '../../lib/types'
+
+interface LocalMessage {
+  id: string
+  type: 'user' | 'assistant' | 'error'
+  content: string
+  agent: string
+  timestamp: Date
+}
 
 // Agents par défaut (en attendant la vraie API)
 const defaultAgents = [
@@ -45,18 +54,17 @@ const initialMessages = [
 ]
 
 export function ChatInterface() {
-  const { agents, models, getAgents, getModels, executeAgent, error: agentError } = useAgents()
-  const { messages, isTyping, sendMessage, clearMessages } = useChat()
-  const [selectedAgent, setSelectedAgent] = useState<any>(null)
+  const { messages, isTyping, sendMessage } = useChat()
+  const { agents, getAgents, error: agentError } = useAgents()
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [inputValue, setInputValue] = useState('')
-  const [localMessages, setLocalMessages] = useState(initialMessages)
+  const [localMessages, setLocalMessages] = useState<LocalMessage[]>([])
   const [error, setError] = useState<string | null>(null)
 
   // Charger les agents et modèles disponibles
   useEffect(() => {
     getAgents()
-    getModels()
-  }, [getAgents, getModels])
+  }, [getAgents])
 
   // Sélectionner le premier agent disponible
   useEffect(() => {
@@ -68,9 +76,9 @@ export function ChatInterface() {
   const handleSendMessage = async () => {
     if (!inputValue.trim() || !selectedAgent) return
 
-    const userMessage = {
+    const userMessage: LocalMessage = {
       id: Date.now().toString(),
-      type: 'user' as const,
+      type: 'user',
       content: inputValue,
       agent: 'Vous',
       timestamp: new Date(),
@@ -87,9 +95,9 @@ export function ChatInterface() {
       // Ajouter la réponse de l'agent aux messages locaux
       const lastMessage = messages[messages.length - 1]
       if (lastMessage && lastMessage.type === 'agent') {
-        const agentMessage = {
+        const agentMessage: LocalMessage = {
           id: (Date.now() + 1).toString(),
-          type: 'assistant' as const,
+          type: 'assistant',
           content: lastMessage.content,
           agent: selectedAgent.name,
           timestamp: new Date(),
@@ -98,9 +106,9 @@ export function ChatInterface() {
       }
     } catch (err) {
       setError((err as Error).message)
-      const errorMessage = {
+      const errorMessage: LocalMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'error' as const,
+        type: 'error',
         content: (err as Error).message,
         agent: 'Système',
         timestamp: new Date(),
@@ -243,11 +251,11 @@ export function ChatInterface() {
             </p>
             <div className="space-y-2">
               <Button variant="outline" size="sm" className="w-full">
-                <Settings className="h-4 w-4 mr-2" />
+                {/* <Settings className="h-4 w-4 mr-2" /> */}
                 Configuration
               </Button>
               <Button variant="outline" size="sm" className="w-full">
-                <MessageSquare className="h-4 w-4 mr-2" />
+                {/* <MessageSquare className="h-4 w-4 mr-2" /> */}
                 Historique
               </Button>
             </div>

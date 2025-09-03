@@ -16,44 +16,46 @@ import {
   RotateCcw,
   Settings,
   Eye,
-  EyeOff
+  EyeOff,
+  AlertCircle,
+  Send
 } from 'lucide-react';
 import { AgentSelector } from './agent-selector';
 import { DelegationView } from './delegation-view';
 import { WorkflowSelector } from './workflow-selector';
 import { useChat } from '@/lib/hooks';
-import { Agent, AgentMessage, AgentResponse } from '@elavira/core';
+import { Agent } from '@/lib/types';
+import { AgentMessage, AgentResponse } from '@/lib/types';
 
 export interface MultiAgentChatProps {
   className?: string;
 }
 
-export interface DelegationInfo {
-  from: string;
-  to: string;
-  message: string;
-  timestamp: Date;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  response?: string;
-  confidence?: number;
+interface WorkflowInfo {
+  id: string
+  name: string
+  description: string
+  agents: string[]
 }
 
-export interface WorkflowInfo {
-  id: string;
-  name: string;
-  status: 'idle' | 'running' | 'completed' | 'failed';
-  currentStep?: string;
-  progress: number;
-  steps: Array<{
-    id: string;
-    name: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    agentId: string;
-  }>;
+interface DelegationInfo {
+  id: string
+  from: string
+  to: string
+  message: string
+  status: 'pending' | 'completed' | 'failed'
+  timestamp: Date
 }
+
+interface ExtendedMessage extends AgentMessage {
+  response?: AgentResponse
+}
+
+// Exporter WorkflowInfo et DelegationInfo pour les autres composants
+export type { WorkflowInfo, DelegationInfo }
 
 export function MultiAgentChat({ className }: MultiAgentChatProps) {
-  const [messages, setMessages] = useState<Array<AgentMessage & { response?: AgentResponse }>>([]);
+  const [messages, setMessages] = useState<Array<ExtendedMessage>>([]);
   const [inputValue, setInputValue] = useState('');
   const [selectedAgents, setSelectedAgents] = useState<Agent[]>([]);
   const [delegations, setDelegations] = useState<DelegationInfo[]>([]);
@@ -63,7 +65,7 @@ export function MultiAgentChat({ className }: MultiAgentChatProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { sendMessage, isLoading } = useChat();
+  const { sendMessage, isTyping } = useChat();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -77,6 +79,7 @@ export function MultiAgentChat({ className }: MultiAgentChatProps) {
     const userMessage: AgentMessage = {
       id: `msg-${Date.now()}`,
       content: inputValue,
+      sender: 'user',
       role: 'user',
       timestamp: new Date(),
       conversationId: 'multi-agent-chat'
@@ -99,9 +102,12 @@ export function MultiAgentChat({ className }: MultiAgentChatProps) {
       setMessages(prev => [...prev, {
         ...userMessage,
         response: {
+          id: `error-${Date.now()}`,
           content: 'Erreur lors de l\'envoi du message',
-          timestamp: new Date(),
-          metadata: { error: true }
+          toolCalls: [],
+          thoughts: [],
+          metadata: { error: true },
+          timestamp: new Date()
         }
       }]);
     } finally {
@@ -135,12 +141,12 @@ export function MultiAgentChat({ className }: MultiAgentChatProps) {
   };
 
   // Send message to selected agents
-  const sendToSelectedAgents = async (message: AgentMessage) => {
+  const sendToSelectedAgents = async (message: ExtendedMessage) => {
     const agentResponses = await Promise.allSettled(
       selectedAgents.map(agent => 
-        sendMessage(message.content, agent.id)
+        sendMessage(agent.id, message.content)
       )
-    );
+    )
 
     const responses = agentResponses.map((result, index) => {
       if (result.status === 'fulfilled') {
@@ -148,38 +154,40 @@ export function MultiAgentChat({ className }: MultiAgentChatProps) {
           agentId: selectedAgents[index].id,
           agentName: selectedAgents[index].name,
           response: result.value
-        };
+        }
       } else {
         return {
           agentId: selectedAgents[index].id,
           agentName: selectedAgents[index].name,
           error: 'Erreur de communication'
-        };
+        }
       }
-    });
+    })
 
     // Add responses to messages
-    responses.forEach(({ agentId, agentName, response, error }) => {
-      if (response) {
+    responses.forEach((response: any) => {
+      if (response.response) {
         setMessages(prev => [...prev, {
-          id: `response-${Date.now()}-${agentId}`,
-          content: `**${agentName}:** ${response.content}`,
+          id: `response-${Date.now()}-${response.agentId}`,
+          content: response.response.content,
+          sender: 'agent',
           role: 'assistant',
           timestamp: new Date(),
           conversationId: 'multi-agent-chat',
-          metadata: { agentId, agentName }
-        }]);
-      } else if (error) {
+          metadata: { agentId: response.agentId, agentName: response.agentName }
+        }])
+      } else if (response.error) {
         setMessages(prev => [...prev, {
-          id: `error-${Date.now()}-${agentId}`,
-          content: `**${agentName}:** ${error}`,
+          id: `error-${Date.now()}-${response.agentId}`,
+          content: response.error,
+          sender: 'agent',
           role: 'assistant',
           timestamp: new Date(),
           conversationId: 'multi-agent-chat',
-          metadata: { agentId, agentName, error: true }
-        }]);
+          metadata: { agentId: response.agentId, agentName: response.agentName, error: true }
+        }])
       }
-    });
+    })
   };
 
   // Handle workflow selection
@@ -314,9 +322,10 @@ export function MultiAgentChat({ className }: MultiAgentChatProps) {
               />
               <Button
                 onClick={handleSendMessage}
-                disabled={isProcessing || !inputValue.trim() || (isOrchestrationMode ? false : selectedAgents.length === 0)}
+                disabled={isProcessing || !inputValue.trim()}
               >
-                {isProcessing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                {isProcessing ? <AlertCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                {isProcessing ? 'Envoi...' : 'Envoyer'}
               </Button>
             </div>
           </div>
@@ -324,11 +333,21 @@ export function MultiAgentChat({ className }: MultiAgentChatProps) {
 
         {/* Delegation sidebar */}
         {showDelegations && (
-          <div className="w-80 border-l">
-            <DelegationView
-              delegations={delegations}
-              activeWorkflow={activeWorkflow}
-            />
+          <div className="border-l pl-4">
+            <h4 className="font-medium mb-2">Délégations</h4>
+            <div className="space-y-2">
+              {delegations.map((delegation) => (
+                <div key={delegation.id} className="text-sm p-2 bg-muted rounded">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{delegation.from} → {delegation.to}</span>
+                    <Badge variant={delegation.status === 'completed' ? 'default' : 'secondary'}>
+                      {delegation.status}
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground">{delegation.message}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

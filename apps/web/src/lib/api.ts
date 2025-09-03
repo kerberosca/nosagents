@@ -1,83 +1,31 @@
 // Configuration API pour communiquer avec le worker
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
+// Importer les types unifiés
+import type {
+  ApiResponse,
+  JobRequest,
+  JobResult,
+  AgentExecutionRequest,
+  Agent,
+  CreateAgentRequest,
+  UpdateAgentRequest,
+  RAGSearchRequest,
+  RAGIndexRequest
+} from './types';
 
-export interface JobRequest {
-  type: string;
-  data: any;
-  priority?: number;
-}
-
-export interface JobResult {
-  id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-  result?: any;
-  error?: string;
-  progress?: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AgentExecutionRequest {
-  agentId: string;
-  message: string;
-  context?: any;
-}
-
-export interface Agent {
-  id: string;
-  name: string;
-  description: string;
-  role: string;
-  model: string;
-  systemPrompt: string;
-  tools: string[];
-  permissions: {
-    network: boolean;
-    filesystem: boolean;
-    tools: string[];
-  };
-  knowledgePacks: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateAgentRequest {
-  name: string;
-  description: string;
-  role: string;
-  model: string;
-  systemPrompt: string;
-  tools: string[];
-  permissions: {
-    network: boolean;
-    filesystem: boolean;
-    tools: string[];
-  };
-  knowledgePacks: string[];
-}
-
-export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {
-  id: string;
-}
-
-export interface RAGSearchRequest {
-  query: string;
-  topK?: number;
-  filters?: any;
-}
-
-export interface RAGIndexRequest {
-  file?: File;
-  directory?: string;
-  options?: any;
-}
+// Ré-exporter les types pour compatibilité
+export type {
+  ApiResponse,
+  JobRequest,
+  JobResult,
+  AgentExecutionRequest,
+  Agent,
+  CreateAgentRequest,
+  UpdateAgentRequest,
+  RAGSearchRequest,
+  RAGIndexRequest
+};
 
 // Classe pour gérer les appels API
 class ApiClient {
@@ -199,29 +147,14 @@ class ApiClient {
       formData.append('options', JSON.stringify(options));
     }
 
-    try {
-      const response = await fetch(`${this.baseUrl}/api/rag/index/file`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('RAG index file failed:', error);
-      return {
-        success: false,
-        error: (error as Error).message,
-      };
-    }
+    return this.request<any>('/api/rag/index', {
+      method: 'POST',
+      body: formData,
+    });
   }
 
   async indexDirectory(directory: string, options?: any): Promise<ApiResponse<any>> {
-    return this.request<any>('/api/rag/index/directory', {
+    return this.request<any>('/api/rag/index-directory', {
       method: 'POST',
       body: JSON.stringify({ directory, options }),
     });

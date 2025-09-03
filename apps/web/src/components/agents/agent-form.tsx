@@ -125,7 +125,7 @@ export function AgentForm({
           {/* Informations de base */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nom de l'agent *</Label>
+              <Label htmlFor="name">Nom de l&apos;agent *</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -272,7 +272,7 @@ export function AgentForm({
                 <div>
                   <Label htmlFor="network">Accès réseau</Label>
                   <p className="text-sm text-muted-foreground">
-                    Permettre à l'agent d'accéder à Internet
+                    Permettre à l&apos;agent d&apos;accéder à Internet
                   </p>
                 </div>
                 <Switch
@@ -285,7 +285,7 @@ export function AgentForm({
                 <div>
                   <Label htmlFor="filesystem">Accès système de fichiers</Label>
                   <p className="text-sm text-muted-foreground">
-                    Permettre à l'agent de lire/écrire des fichiers
+                    Permettre à l&apos;agent de lire/écrire des fichiers
                   </p>
                 </div>
                 <Switch

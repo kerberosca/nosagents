@@ -9,11 +9,17 @@
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit",
-    "test": "node test-rag.js"
+    "test": "node test-rag.js",
+    "test:unified": "node test-unified-rag.js",
+    "test:text": "node test-rag-text-only.js",
+    "test:optimized": "node test-optimized-rag.js",
+    "test:simple": "node test-simple-rag.js",
+    "test:robust": "node test-robust-rag.js",
+    "test:agent": "node test-agent-integration.js"
   },
   "dependencies": {
     "@elavira/config": "workspace:*",
-    "lancedb": "^0.0.1",
+    "@lancedb/lancedb": "^0.21.3",
     "mammoth": "^1.6.0",
     "node-html-parser": "^6.1.12",
     "pdf-parse": "^1.1.1",

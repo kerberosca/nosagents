@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 import { JobQueueService } from './services/job-queue';
+import { SimpleJobQueueService } from './services/job-queue-simple';
 import { AgentService } from './services/agent-service';
 import { RAGService } from './services/rag-service';
 import { createJobsRouter } from './routes/jobs';
@@ -15,11 +16,11 @@ import { createAgentsRouter } from './routes/agents';
 import { createRAGRouter } from './routes/rag';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
-import { JobType } from './types';
+import { JobType, IJobQueueService } from './types';
 
 class WorkerApp {
   private app: express.Application;
-  private jobQueueService!: JobQueueService;
+  private jobQueueService!: IJobQueueService;
   private agentService!: AgentService;
   private ragService!: RAGService;
   private server: any;
@@ -45,9 +46,28 @@ class WorkerApp {
     };
 
     // Initialiser les services
-    this.jobQueueService = new JobQueueService(config);
+    // Utiliser la version simple si Redis n'est pas disponible
+    const useSimpleQueue = process.env.NODE_ENV === 'development' || !process.env.REDIS_URL;
+    if (useSimpleQueue) {
+      this.jobQueueService = new SimpleJobQueueService(config);
+    } else {
+      this.jobQueueService = new JobQueueService(config);
+    }
     this.agentService = new AgentService();
-    this.ragService = new RAGService();
+    
+    // Initialiser le service RAG avec gestion d'erreur
+    try {
+      this.ragService = new RAGService();
+    } catch (error) {
+      logger.warn('RAG service initialization failed, continuing without RAG:', error);
+      // Créer un service RAG factice pour éviter les erreurs
+      this.ragService = {
+        indexFile: async () => ({ success: false, error: 'RAG service not available' }),
+        indexDirectory: async () => ({ success: false, error: 'RAG service not available' }),
+        search: async () => ({ results: [], error: 'RAG service not available' }),
+        getStats: async () => ({ totalDocuments: 0, totalChunks: 0, totalSize: 0, lastUpdated: new Date() }),
+      } as any;
+    }
 
     // Créer les dossiers nécessaires
     this.createDirectories();
@@ -71,7 +91,7 @@ class WorkerApp {
 
     // CORS
     this.app.use(cors({
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003'],
       credentials: true,
     }));
 
@@ -165,6 +185,16 @@ class WorkerApp {
 
   private setupErrorHandling(): void {
     this.app.use(errorHandler);
+    
+    // Gestion globale des erreurs non gérées
+    process.on('unhandledRejection', (reason, promise) => {
+      logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    });
+    
+    process.on('uncaughtException', (error) => {
+      logger.error('Uncaught Exception:', error);
+      process.exit(1);
+    });
   }
 
   private async getHealthStatus(): Promise<any> {

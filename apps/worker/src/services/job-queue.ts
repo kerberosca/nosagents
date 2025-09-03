@@ -1,9 +1,9 @@
 import Queue from 'bull';
-import { JobRequest, JobResult, JobProgress, JobType, JobStatus } from '../types';
+import { JobRequest, JobResult, JobProgress, JobType, JobStatus, IJobQueueService } from '../types';
 import { logger } from '../utils/logger';
 
-export class JobQueueService {
-  private queues: Map<JobType, Queue.Queue> = new Map();
+export class JobQueueService implements IJobQueueService {
+  public queues: Map<JobType, Queue.Queue> = new Map();
   private config: any;
 
   constructor(config: any) {
@@ -11,7 +11,7 @@ export class JobQueueService {
     this.initializeQueues();
   }
 
-  private initializeQueues(): void {
+  public initializeQueues(): void {
     // Créer une queue pour chaque type de job
     Object.values(JobType).forEach(jobType => {
       const queue = new Queue(jobType, this.config.redisUrl, {
@@ -85,7 +85,7 @@ export class JobQueueService {
       type: jobType,
       data: job.data,
       progress: job.progress(),
-      status: await this.getJobStatus(job),
+      status: await this.getJobStatusFromJob(job),
       timestamp: job.timestamp,
       processedOn: job.processedOn,
       finishedOn: job.finishedOn,
@@ -93,7 +93,36 @@ export class JobQueueService {
     };
   }
 
-  async getJobStatus(job: Queue.Job): Promise<JobStatus> {
+  async getJobStatus(jobId: string): Promise<JobStatus> {
+    // Chercher le job dans toutes les queues
+    for (const [jobType, queue] of this.queues) {
+      const job = await queue.getJob(jobId);
+      if (job) {
+        const state = await job.getState();
+        
+        switch (state) {
+          case 'waiting':
+            return JobStatus.PENDING;
+          case 'active':
+            return JobStatus.RUNNING;
+          case 'completed':
+            return JobStatus.COMPLETED;
+          case 'failed':
+            return JobStatus.FAILED;
+          case 'delayed':
+            return JobStatus.PENDING;
+          case 'paused':
+            return JobStatus.CANCELLED;
+          default:
+            return JobStatus.PENDING;
+        }
+      }
+    }
+    
+    return JobStatus.UNKNOWN;
+  }
+
+  private async getJobStatusFromJob(job: Queue.Job): Promise<JobStatus> {
     const state = await job.getState();
     
     switch (state) {
@@ -177,7 +206,7 @@ export class JobQueueService {
   }
 
   // Méthodes pour enregistrer les processeurs de jobs
-  registerJobProcessor(jobType: JobType, processor: (job: Queue.Job) => Promise<any>): void {
+  async registerJobProcessor(jobType: JobType, processor: (job: Queue.Job) => Promise<any>): Promise<void> {
     const queue = this.queues.get(jobType);
     if (!queue) {
       throw new Error(`Queue not found for job type: ${jobType}`);
@@ -196,5 +225,63 @@ export class JobQueueService {
     });
 
     logger.info(`Job processor registered for: ${jobType}`);
+  }
+
+  // Méthodes supplémentaires pour compatibilité avec l'interface
+  async updateJobStatus(jobId: string, status: JobStatus, result?: any): Promise<void> {
+    // Pour Bull, le statut est géré automatiquement
+    logger.info(`Job status updated:`, { jobId, status });
+  }
+
+  async getJobsByType(jobType: JobType): Promise<any[]> {
+    const queue = this.queues.get(jobType);
+    if (!queue) {
+      return [];
+    }
+
+    const [waiting, active, completed, failed] = await Promise.all([
+      queue.getWaiting(),
+      queue.getActive(),
+      queue.getCompleted(),
+      queue.getFailed(),
+    ]);
+
+    const allJobs = [...waiting, ...active, ...completed, ...failed];
+    const jobsWithStatus = await Promise.all(
+      allJobs.map(async (job) => ({
+        id: job.id,
+        type: jobType,
+        status: await this.getJobStatus(job.id.toString()),
+        timestamp: job.timestamp,
+        priority: job.opts.priority || 0,
+      }))
+    );
+
+    return jobsWithStatus;
+  }
+
+  async getStats(): Promise<any> {
+    return this.getAllStats();
+  }
+
+  async clear(): Promise<void> {
+    for (const [jobType, queue] of this.queues) {
+      await queue.empty();
+      logger.info(`Queue cleared: ${jobType}`);
+    }
+  }
+
+  async processJob(jobType: JobType, jobId: string, processor: (job: any) => Promise<any>): Promise<any> {
+    const queue = this.queues.get(jobType);
+    if (!queue) {
+      throw new Error(`Queue not found for job type: ${jobType}`);
+    }
+
+    const job = await queue.getJob(jobId);
+    if (!job) {
+      throw new Error(`Job not found: ${jobId}`);
+    }
+
+    return await processor(job);
   }
 }

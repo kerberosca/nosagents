@@ -10,4 +10,4 @@ export * from './components/chat-interface';
 export * from './components/tool-list';
 
 // Utilitaires
-export * from './utils/cn';
+export * from './utils';

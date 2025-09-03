@@ -50,7 +50,28 @@ export enum JobStatus {
   RUNNING = 'running',
   COMPLETED = 'completed',
   FAILED = 'failed',
-  CANCELLED = 'cancelled'
+  CANCELLED = 'cancelled',
+  UNKNOWN = 'unknown'
+}
+
+// Interface commune pour les job queue services
+export interface IJobQueueService {
+  addJob(jobRequest: JobRequest): Promise<string>;
+  getJob(jobType: JobType, jobId: string): Promise<any>;
+  getJobStatus(jobId: string): Promise<JobStatus>;
+  updateJobStatus(jobId: string, status: JobStatus, result?: any): Promise<void>;
+  getJobsByType(jobType: JobType): Promise<any[]>;
+  getStats(): Promise<any>;
+  clear(): Promise<void>;
+  cancelJob(jobType: JobType, jobId: string): Promise<boolean>;
+  getQueueStats(jobType: JobType): Promise<any>;
+  getAllStats(): Promise<any>;
+  close(): Promise<void>;
+  registerJobProcessor(jobType: JobType, processor: (job: any) => Promise<any>): Promise<void>;
+  processJob(jobType: JobType, jobId: string, processor: (job: any) => Promise<any>): Promise<any>;
+  queues: Map<JobType, any>;
+  initializeQueues(): void;
+  cleanQueues(): Promise<void>;
 }
 
 export interface AgentExecutionJob {

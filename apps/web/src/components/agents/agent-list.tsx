@@ -153,9 +153,9 @@ export function AgentList({ agents, onEdit, onDelete, onChat, loading = false }:
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Supprimer l'agent</AlertDialogTitle>
+                      <AlertDialogTitle>Supprimer l&apos;agent</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Êtes-vous sûr de vouloir supprimer l'agent "{agent.name}" ? 
+                        Êtes-vous sûr de vouloir supprimer l&apos;agent &quot;{agent.name}&quot; ? 
                         Cette action est irréversible et supprimera toutes les données associées.
                       </AlertDialogDescription>
                     </AlertDialogHeader>

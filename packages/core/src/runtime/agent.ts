@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { Agent as AgentConfig } from '@elavira/config';
+import { Agent as AgentConfig } from '../types';
 import { ModelProvider, ModelRequest } from '../models/model-provider';
 import { ToolRegistry } from '../tools/tool-registry';
 import { MemoryManager } from '../memory/memory-manager';
@@ -93,6 +93,7 @@ export class Agent {
           })),
           { role: 'user' as const, content },
         ],
+        model: this.config.model,
         config: {
           model: this.config.model,
           temperature: 0.7,
@@ -146,7 +147,7 @@ export class Agent {
     return `Tu es ${this.config.name}, ${this.config.role}.
 
 Objectifs:
-${this.config.goals.map(goal => `- ${goal}`).join('\n')}
+${this.config.goals.map((goal: string) => `- ${goal}`).join('\n')}
 
 Ton style de communication: ${this.config.style.tone}
 Langue: ${this.config.style.language}
@@ -162,7 +163,7 @@ Instructions:
   }
 
   private getAvailableTools() {
-    return this.config.tools.map(toolName => {
+    return this.config.tools.map((toolName: string) => {
       const tool = this.toolRegistry.getTool(toolName);
       if (!tool) {
         this.logger.warn(`Outil ${toolName} non trouvé dans le registre`);

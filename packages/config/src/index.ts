@@ -20,6 +20,27 @@ export const EnvSchema = z.object({
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
 
+// Configuration des modèles IA
+export const ModelProviderSchema = z.object({
+  type: z.enum(['ollama', 'localai', 'openai']),
+  config: z.object({
+    baseUrl: z.string(),
+    defaultModel: z.string(),
+    timeout: z.number().default(30000),
+    apiKey: z.string().optional(),
+  }),
+  enabled: z.boolean().default(true),
+});
+
+export const UnifiedModelConfigSchema = z.object({
+  fallbackOrder: z.array(z.enum(['ollama', 'localai', 'openai'])).default(['ollama', 'localai', 'openai']),
+  enableFallback: z.boolean().default(true),
+  providers: z.array(ModelProviderSchema).default([]),
+});
+
+export type ModelProvider = z.infer<typeof ModelProviderSchema>;
+export type UnifiedModelConfig = z.infer<typeof UnifiedModelConfigSchema>;
+
 // Configuration d'un agent
 export const AgentSchema = z.object({
   name: z.string().min(1),
@@ -145,6 +166,6 @@ export const CONSTANTS = {
 } as const;
 
 // Types utilitaires
-export type ModelProvider = 'ollama' | 'localai' | 'openai';
+export type ModelProviderType = 'ollama' | 'localai' | 'openai';
 export type MemoryType = 'postgres' | 'memory';
 export type AgentScope = 'per-agent' | 'global';

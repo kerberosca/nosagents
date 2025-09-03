@@ -94,7 +94,7 @@ export function useJobs() {
     try {
       const response = await apiClient.getQueueStats();
       if (response.success) {
-        setStats(response.data);
+        setStats(response.stats || response.data);
       }
     } catch (err) {
       console.error('Erreur lors de la récupération des stats:', err);
@@ -247,7 +247,7 @@ export function useAgents() {
     try {
       const response = await apiClient.getAvailableModels();
       if (response.success) {
-        setModels(response.data || []);
+        setModels(response.models || response.data || []);
       }
     } catch (err) {
       console.error('Erreur lors de la récupération des modèles:', err);
@@ -269,7 +269,7 @@ export function useAgents() {
     try {
       const response = await apiClient.getAgentStats();
       if (response.success) {
-        setStats(response.data);
+        setStats(response.stats);
       }
     } catch (err) {
       console.error('Erreur lors de la récupération des stats:', err);
@@ -279,11 +279,18 @@ export function useAgents() {
   const checkHealth = useCallback(async () => {
     try {
       const response = await apiClient.checkAgentHealth();
-      if (response.success) {
-        setHealth(response.data);
+      console.log('🏥 Réponse API reçue:', response);
+      console.log('🏥 response.health:', response.health);
+      
+      if (response.success && response.health) {
+        console.log('🏥 Mise à jour health avec:', response.health);
+        setHealth(response.health);
+        console.log('🏥 État health après setHealth:', response.health);
+      } else {
+        console.log('🏥 Pas de mise à jour - conditions non remplies');
       }
     } catch (err) {
-      console.error('Erreur lors de la vérification de santé:', err);
+      console.error('Erreur checkHealth:', err);
     }
   }, []);
 
@@ -374,7 +381,7 @@ export function useRAG() {
     try {
       const response = await apiClient.getRAGStats();
       if (response.success) {
-        setStats(response.data);
+        setStats(response.stats || response.data);
       }
     } catch (err) {
       console.error('Erreur lors de la récupération des stats RAG:', err);

@@ -46,7 +46,7 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="embed-model">Modèle d'embeddings</Label>
+              <Label htmlFor="embed-model">Modèle d&apos;embeddings</Label>
               <Input
                 id="embed-model"
                 defaultValue="nomic-embed-text"
@@ -124,7 +124,7 @@ export default function SettingsPage() {
               <div>
                 <Label>Accès fichiers</Label>
                 <p className="text-sm text-muted-foreground">
-                  Autoriser l'accès au système de fichiers
+                  Autoriser l&apos;accès au système de fichiers
                 </p>
               </div>
               <Switch id="filesystem-access" defaultChecked />
