@@ -1,9 +1,14 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+'use client'
+
+import { WorkflowEditor } from '@/components/workflows/workflow-editor'
+import { WorkflowVisualEditor } from '@/components/workflows/workflow-visual-editor'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Plus, Play, Settings, Trash2 } from 'lucide-react'
+import { Eye, Code } from 'lucide-react'
+import { useState } from 'react'
 
 export default function WorkflowsPage() {
+  const [viewMode, setViewMode] = useState<'editor' | 'visual'>('editor')
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -13,116 +18,25 @@ export default function WorkflowsPage() {
             Orchestrez vos agents pour des tâches complexes
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouveau workflow
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+            variant={viewMode === 'editor' ? 'default' : 'outline'}
+            onClick={() => setViewMode('editor')}
+          >
+            <Code className="h-4 w-4 mr-2" />
+            Éditeur
+          </Button>
+          <Button
+            variant={viewMode === 'visual' ? 'default' : 'outline'}
+            onClick={() => setViewMode('visual')}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Visuel
+          </Button>
+        </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Planification de menu</CardTitle>
-              <Badge variant="default">Actif</Badge>
-            </div>
-            <CardDescription>
-              Assistant → Chef pour la création de menus
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              Déclenché par une demande de menu, l&apos;Assistant délègue au Chef pour créer un plan de repas personnalisé.
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex space-x-1">
-                <Badge variant="outline" className="text-xs">Assistant</Badge>
-                <Badge variant="outline" className="text-xs">Chef</Badge>
-              </div>
-              <div className="flex space-x-1">
-                <Button variant="ghost" size="sm">
-                  <Play className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Settings className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Création d&apos;exercice</CardTitle>
-              <Badge variant="secondary">Inactif</Badge>
-            </div>
-            <CardDescription>
-              Assistant → Prof pour la création d&apos;exercices
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              L&apos;Assistant reçoit une demande d&apos;exercice et délègue au Prof pour créer du contenu pédagogique adapté.
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex space-x-1">
-                <Badge variant="outline" className="text-xs">Assistant</Badge>
-                <Badge variant="outline" className="text-xs">Prof</Badge>
-              </div>
-              <div className="flex space-x-1">
-                <Button variant="ghost" size="sm">
-                  <Play className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Settings className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Analyse de documents</CardTitle>
-              <Badge variant="default">Actif</Badge>
-            </div>
-            <CardDescription>
-              Multi-agents pour l&apos;analyse complexe
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              Workflow complexe utilisant plusieurs agents pour analyser et résumer des documents.
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex space-x-1">
-                <Badge variant="outline" className="text-xs">Assistant</Badge>
-                <Badge variant="outline" className="text-xs">Prof</Badge>
-                <Badge variant="outline" className="text-xs">Chef</Badge>
-              </div>
-              <div className="flex space-x-1">
-                <Button variant="ghost" size="sm">
-                  <Play className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Settings className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      
+      {viewMode === 'editor' ? <WorkflowEditor /> : <WorkflowVisualEditor />}
     </div>
   )
 }

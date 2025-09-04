@@ -11,6 +11,7 @@ import { JobQueueService } from './services/job-queue';
 import { SimpleJobQueueService } from './services/job-queue-simple';
 import { AgentService } from './services/agent-service';
 import { RAGService } from './services/rag-service';
+import { databaseService } from './services/database-service';
 import { createJobsRouter } from './routes/jobs';
 import { createAgentsRouter } from './routes/agents';
 import { createRAGRouter } from './routes/rag';
@@ -27,14 +28,16 @@ class WorkerApp {
 
   constructor() {
     this.app = express();
-    this.initializeServices();
     this.setupMiddleware();
-    this.setupRoutes();
-    this.setupJobProcessors();
     this.setupErrorHandling();
+    // setupRoutes() sera appelé après l'initialisation des services
   }
 
-  private initializeServices(): void {
+  async initialize(): Promise<void> {
+    await this.initializeServices();
+  }
+
+  private async initializeServices(): Promise<void> {
     // Configuration
     const config = {
       redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -45,6 +48,16 @@ class WorkerApp {
       rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100'),
     };
 
+    // Initialiser la base de données en premier
+    try {
+      logger.info('🔌 Initialisation de la connexion à la base de données...');
+      await databaseService.connect();
+      logger.info('✅ Base de données initialisée avec succès');
+    } catch (error) {
+      logger.error('❌ Échec de l\'initialisation de la base de données:', error);
+      throw error;
+    }
+
     // Initialiser les services
     // Utiliser la version simple si Redis n'est pas disponible
     const useSimpleQueue = process.env.NODE_ENV === 'development' || !process.env.REDIS_URL;
@@ -54,6 +67,8 @@ class WorkerApp {
       this.jobQueueService = new JobQueueService(config);
     }
     this.agentService = new AgentService();
+    // Attendre l'initialisation de l'AgentService
+    await this.agentService.initializeServices();
     
     // Initialiser le service RAG avec gestion d'erreur
     try {
@@ -71,6 +86,12 @@ class WorkerApp {
 
     // Créer les dossiers nécessaires
     this.createDirectories();
+    
+    // Configurer les processeurs de jobs après l'initialisation des services
+    this.setupJobProcessors();
+    
+    // Configurer les routes APRÈS l'initialisation des services
+    this.setupRoutes();
   }
 
   private createDirectories(): void {
@@ -150,6 +171,24 @@ class WorkerApp {
     this.app.use('/api/jobs', createJobsRouter(this.jobQueueService));
     this.app.use('/api/agents', createAgentsRouter(this.agentService, this.jobQueueService));
     this.app.use('/api/rag', createRAGRouter(this.ragService, this.jobQueueService));
+    
+    // Route de test de la base de données
+    this.app.get('/api/database/test', async (req, res) => {
+      try {
+        const stats = await databaseService.getDatabaseStats();
+        res.json({
+          success: true,
+          message: 'Test de la base de données réussi',
+          stats
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: 'Test de la base de données échoué',
+          message: (error as Error).message
+        });
+      }
+    });
 
     // Route 404
     this.app.use(notFoundHandler);
@@ -203,9 +242,9 @@ class WorkerApp {
 
     // Vérifier les services
     const services = {
-      database: true, // À implémenter avec Prisma
+      database: databaseService.isDatabaseConnected,
       redis: true, // À vérifier avec Bull
-      ollama: await this.agentService.isOllamaAvailable(),
+      ollama: true, // Ollama est géré par AgentService, pas besoin de vérifier ici
       rag: true, // À vérifier avec RAGService
     };
 
@@ -237,8 +276,21 @@ class WorkerApp {
   }
 
   async start(): Promise<void> {
-    const port = parseInt(process.env.PORT || '3001');
-    const host = process.env.HOST || 'localhost';
+    const port = parseInt(process.env.WORKER_PORT || process.env.PORT || '3001');
+    const host = process.env.WORKER_HOST || process.env.HOST || 'localhost';
+    
+    // Debug: afficher les variables d'environnement
+    logger.info(`Environment variables - WORKER_PORT: ${process.env.WORKER_PORT}, PORT: ${process.env.PORT}, HOST: ${process.env.HOST}`);
+    logger.info(`Calculated port: ${port}, host: ${host}`);
+
+    // Initialiser les services (y compris la base de données)
+    try {
+      await this.initialize();
+      logger.info('✅ Tous les services initialisés avec succès');
+    } catch (error) {
+      logger.error('❌ Échec de l\'initialisation des services:', error);
+      throw error;
+    }
 
     return new Promise((resolve, reject) => {
       this.server = this.app.listen(port, host, () => {
@@ -262,6 +314,9 @@ class WorkerApp {
           
           // Fermer les services
           await this.jobQueueService.close();
+          
+          // Fermer la connexion à la base de données
+          await databaseService.disconnect();
           
           resolve();
         });

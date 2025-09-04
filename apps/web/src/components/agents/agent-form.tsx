@@ -126,6 +126,8 @@ export function AgentForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nom de l&apos;agent *</Label>
+
+              
               <Input
                 id="name"
                 value={formData.name}

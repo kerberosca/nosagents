@@ -1,4 +1,4 @@
-import { KnowledgeManager } from '@/components/knowledge/knowledge-manager'
+import { AdvancedKnowledgeManager } from '@/components/knowledge/advanced-knowledge-manager'
 import { Button } from '@/components/ui/button'
 import { Upload, Plus } from 'lucide-react'
 
@@ -24,7 +24,7 @@ export default function KnowledgePage() {
         </div>
       </div>
       
-      <KnowledgeManager />
+      <AdvancedKnowledgeManager />
     </div>
   )
 }

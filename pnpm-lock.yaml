@@ -234,6 +234,9 @@ importers:
       '@elavira/rag':
         specifier: workspace:*
         version: link:../../packages/rag
+      '@prisma/client':
+        specifier: ^5.7.0
+        version: 5.22.0(prisma@5.22.0)
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
@@ -366,9 +369,6 @@ importers:
       '@elavira/config':
         specifier: workspace:*
         version: link:../config
-      '@elavira/core':
-        specifier: workspace:*
-        version: link:../core
       '@lancedb/lancedb':
         specifier: ^0.21.3
         version: 0.21.3(apache-arrow@18.1.0)

@@ -9,15 +9,16 @@ export class AgentService {
   private memoryManager!: MemoryManager;
 
   constructor() {
-    this.initializeServices();
+    // Le constructeur ne fait plus l'initialisation automatique
+    // L'initialisation doit être appelée explicitement
   }
 
-  private async initializeServices(): Promise<void> {
+  public async initializeServices(): Promise<void> {
     try {
       // Initialiser le provider Ollama
-      this.ollamaProvider = new OllamaProvider(
-        process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
-      );
+      this.ollamaProvider = new OllamaProvider({
+        baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
+      });
 
       // Initialiser le registre d'outils
       this.toolRegistry = new ToolRegistry();
@@ -32,8 +33,8 @@ export class AgentService {
         this.memoryManager
       );
 
-      // Charger les agents depuis les fichiers YAML
-      await this.loadAgentsFromFiles();
+      // Charger les agents depuis la base de données PostgreSQL
+      await this.loadAgentsFromDatabase();
 
       logger.info('Agent service initialized successfully');
     } catch (error) {
@@ -201,44 +202,73 @@ export class AgentService {
     }
   }
 
-  private async loadAgentsFromFiles(): Promise<void> {
+  private async loadAgentsFromDatabase(): Promise<void> {
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const yaml = require('js-yaml');
+      // Importer Prisma
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
 
-      const agentsDir = path.join(process.cwd(), '..', '..', 'agents');
-      
-      if (!fs.existsSync(agentsDir)) {
-        logger.warn('Agents directory not found:', agentsDir);
-        return;
-      }
+      // Récupérer tous les agents actifs depuis la base de données
+      const agents = await prisma.agent.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          role: true,
+          description: true,
+          model: true,
+          goals: true,
+          tools: true,
+          knowledgePackIds: true,
+          authorizations: true,
+          style: true,
+        },
+      });
 
-      const files = fs.readdirSync(agentsDir);
-      const yamlFiles = files.filter((file: string) => file.endsWith('.yaml') || file.endsWith('.yml'));
+      await prisma.$disconnect();
 
-      logger.info(`Found ${yamlFiles.length} agent configuration files`);
+      logger.info(`Found ${agents.length} active agents in database`);
 
-      for (let i = 0; i < yamlFiles.length; i++) {
-        const file = yamlFiles[i];
+      // Enregistrer chaque agent dans l'AgentManager
+      for (const dbAgent of agents) {
         try {
-          const filePath = path.join(agentsDir, file);
-          const content = fs.readFileSync(filePath, 'utf8');
-          const config = yaml.load(content);
+          // Convertir le format de la base de données en format AgentConfig
+          const agentConfig = {
+            id: dbAgent.id,
+            name: dbAgent.name,
+            role: dbAgent.role,
+            description: dbAgent.description || '',
+            model: dbAgent.model,
+            goals: dbAgent.goals || [],
+            tools: dbAgent.tools || [],
+            permissions: {
+              network: false,
+              filesystem: true,
+              tools: dbAgent.tools || [],
+            },
+            knowledgePacks: dbAgent.knowledgePackIds || [],
+            style: {
+              tone: 'professionnel',
+              language: 'fr-CA',
+            },
+            authorizations: {
+              network: false,
+              filesystem: true,
+            },
+          };
 
           // Créer l'agent avec la configuration
-          const agent = this.agentManager.registerAgent(config);
-          logger.info(`Agent loaded: ${config.name} (${agent.getAgentId()})`);
+          const agent = this.agentManager.registerAgent(agentConfig);
+          logger.info(`Agent loaded from database: ${dbAgent.name} (${agent.getAgentId()})`);
         } catch (error) {
-          logger.error(`Failed to load agent from ${file}:`, error);
+          logger.error(`Failed to load agent ${dbAgent.name} from database:`, error);
         }
       }
 
-      const stats = this.agentManager.getAgentStats();
-      const agentCount = stats && typeof stats === 'object' ? Object.keys(stats).length : 0;
-      logger.info(`Successfully loaded ${agentCount} agents`);
+      logger.info(`Successfully loaded ${agents.length} agents from database`);
     } catch (error) {
-      logger.error('Failed to load agents from files:', error);
+      logger.error('Failed to load agents from database:', error);
+      // En cas d'erreur, on continue sans agents plutôt que de faire planter l'application
     }
   }
 }

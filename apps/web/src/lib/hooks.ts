@@ -286,11 +286,14 @@ export function useAgents() {
         console.log('🏥 Mise à jour health avec:', response.health);
         setHealth(response.health);
         console.log('🏥 État health après setHealth:', response.health);
+        return response.health;
       } else {
         console.log('🏥 Pas de mise à jour - conditions non remplies');
+        return null;
       }
     } catch (err) {
       console.error('Erreur checkHealth:', err);
+      return null;
     }
   }, []);
 

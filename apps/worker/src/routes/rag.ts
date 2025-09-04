@@ -159,10 +159,20 @@ export function createRAGRouter(
   router.get('/stats', async (req: Request, res: Response) => {
     try {
       const stats = await ragService.getStats();
+      
+      // Transformer les stats pour correspondre au format attendu par le dashboard
+      const dashboardStats = {
+        totalDocuments: stats.vectorStore?.totalDocuments || 0,
+        totalChunks: stats.vectorStore?.totalChunks || 0,
+        totalSize: stats.vectorStore?.totalSize || 0,
+        lastUpdated: stats.vectorStore?.lastUpdated || new Date(),
+        processors: stats.processors || [],
+        embeddingProvider: stats.embeddingProvider || { available: false },
+      };
 
       res.json({
         success: true,
-        stats,
+        stats: dashboardStats,
       });
     } catch (error) {
       logger.error('Failed to get RAG stats:', error);
