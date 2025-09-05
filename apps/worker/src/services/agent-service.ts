@@ -52,10 +52,14 @@ export class AgentService {
       });
 
       // Récupérer l'agent
+      logger.info(`Looking for agent with ID: ${jobData.agentId}`);
       const agent = this.agentManager.getAgent(jobData.agentId);
       if (!agent) {
+        logger.error(`Agent not found: ${jobData.agentId}`);
+        logger.info(`Available agents:`, this.agentManager.getAllAgents().map(a => ({ id: a.getAgentId(), name: a.getConfig().name })));
         throw new Error(`Agent not found: ${jobData.agentId}`);
       }
+      logger.info(`Agent found: ${agent.getConfig().name} (${agent.getAgentId()})`);
 
       // Préparer le contexte
       const context = {
@@ -86,6 +90,8 @@ export class AgentService {
       logger.error('Agent execution failed:', {
         agentId: jobData.agentId,
         error: (error as Error).message,
+        stack: (error as Error).stack,
+        fullError: error,
       });
 
       throw error;
@@ -172,11 +178,14 @@ export class AgentService {
 
   async getAvailableModels(): Promise<string[]> {
     try {
-      // Retourner des modèles statiques pour l'instant
-      return ['qwen2.5:7b', 'llama3.1:8b', 'mistral:7b'];
+      // Récupérer les vrais modèles depuis Ollama
+      const models = await this.ollamaProvider.listModels();
+      logger.info(`Retrieved ${models.length} models from Ollama:`, models);
+      return models;
     } catch (error) {
-      logger.error('Failed to get available models:', error);
-      return [];
+      logger.error('Failed to get available models from Ollama:', error);
+      // Fallback vers des modèles statiques en cas d'erreur
+      return ['qwen2.5:7b', 'llama3.1:8b', 'mistral:7b'];
     }
   }
 
@@ -202,6 +211,209 @@ export class AgentService {
     }
   }
 
+  // Méthodes CRUD pour la gestion des agents
+  async createAgent(agentData: any): Promise<any> {
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      // Créer l'agent dans la base de données
+      const newAgent = await prisma.agent.create({
+        data: {
+          name: agentData.name,
+          role: agentData.role,
+          description: agentData.description,
+          model: agentData.model,
+          systemPrompt: agentData.systemPrompt || '',
+          goals: agentData.goals || [],
+          tools: agentData.tools || [],
+          knowledgePackIds: agentData.knowledgePacks || [],
+          authorizations: agentData.authorizations || { network: false, filesystem: true },
+          style: agentData.style || { tone: 'professionnel', language: 'fr-CA' },
+          isActive: true,
+        },
+      });
+
+      await prisma.$disconnect();
+
+      // Enregistrer l'agent dans l'AgentManager
+      const agentConfig = {
+        id: newAgent.id,
+        name: newAgent.name,
+        role: newAgent.role,
+        description: newAgent.description || '',
+        model: newAgent.model,
+        goals: newAgent.goals || [],
+        tools: newAgent.tools || [],
+        permissions: {
+          network: false,
+          filesystem: true,
+          tools: newAgent.tools || [],
+        },
+        knowledgePacks: newAgent.knowledgePackIds || [],
+        style: newAgent.style || { tone: 'professionnel', language: 'fr-CA' },
+        authorizations: newAgent.authorizations || { network: false, filesystem: true },
+      };
+
+      const agent = this.agentManager.registerAgent(agentConfig, newAgent.id);
+      logger.info(`Agent created: ${newAgent.name} (${agent.getAgentId()})`);
+
+      return {
+        id: newAgent.id,
+        name: newAgent.name,
+        role: newAgent.role,
+        description: newAgent.description,
+        model: newAgent.model,
+        tools: newAgent.tools,
+        knowledgePacks: newAgent.knowledgePackIds,
+        permissions: {
+          network: false,
+          filesystem: true,
+          tools: newAgent.tools,
+        },
+        authorizations: newAgent.authorizations,
+        createdAt: newAgent.createdAt.toISOString(),
+        updatedAt: newAgent.updatedAt.toISOString(),
+      };
+    } catch (error) {
+      logger.error('Failed to create agent:', error);
+      throw error;
+    }
+  }
+
+  async updateAgent(agentId: string, agentData: any): Promise<any> {
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      // Mettre à jour l'agent dans la base de données
+      const updatedAgent = await prisma.agent.update({
+        where: { id: agentId },
+        data: {
+          name: agentData.name,
+          role: agentData.role,
+          description: agentData.description,
+          model: agentData.model,
+          systemPrompt: agentData.systemPrompt || '',
+          goals: agentData.goals || [],
+          tools: agentData.tools || [],
+          knowledgePackIds: agentData.knowledgePacks || [],
+          authorizations: agentData.permissions || { network: false, filesystem: true },
+          style: agentData.style || { tone: 'professionnel', language: 'fr-CA' },
+          updatedAt: new Date(),
+        },
+      });
+
+      await prisma.$disconnect();
+
+      // Mettre à jour l'agent dans l'AgentManager
+      const agentConfig = {
+        id: updatedAgent.id,
+        name: updatedAgent.name,
+        role: updatedAgent.role,
+        description: updatedAgent.description || '',
+        model: updatedAgent.model,
+        systemPrompt: updatedAgent.systemPrompt || '',
+        goals: updatedAgent.goals || [],
+        tools: updatedAgent.tools || [],
+        permissions: {
+          network: updatedAgent.authorizations?.network || false,
+          filesystem: updatedAgent.authorizations?.filesystem || true,
+          tools: updatedAgent.tools || [],
+        },
+        knowledgePacks: updatedAgent.knowledgePackIds || [],
+        style: updatedAgent.style || { tone: 'professionnel', language: 'fr-CA' },
+        authorizations: updatedAgent.authorizations || { network: false, filesystem: true },
+      };
+
+      // Supprimer l'ancien agent et enregistrer le nouveau
+      this.agentManager.unregisterAgent(agentId);
+      const agent = this.agentManager.registerAgent(agentConfig, updatedAgent.id);
+      logger.info(`Agent updated: ${updatedAgent.name} (${agent.getAgentId()})`);
+
+      return {
+        id: updatedAgent.id,
+        name: updatedAgent.name,
+        role: updatedAgent.role,
+        description: updatedAgent.description,
+        model: updatedAgent.model,
+        tools: updatedAgent.tools,
+        knowledgePacks: updatedAgent.knowledgePackIds,
+        permissions: {
+          network: false,
+          filesystem: true,
+          tools: updatedAgent.tools,
+        },
+        authorizations: updatedAgent.authorizations,
+        createdAt: updatedAgent.createdAt.toISOString(),
+        updatedAt: updatedAgent.updatedAt.toISOString(),
+      };
+    } catch (error) {
+      logger.error('Failed to update agent:', error);
+      throw error;
+    }
+  }
+
+  async deleteAgent(agentId: string): Promise<void> {
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      // Supprimer l'agent de la base de données
+      await prisma.agent.delete({
+        where: { id: agentId },
+      });
+
+      await prisma.$disconnect();
+
+      // Supprimer l'agent de l'AgentManager
+      this.agentManager.unregisterAgent(agentId);
+      logger.info(`Agent deleted: ${agentId}`);
+    } catch (error) {
+      logger.error('Failed to delete agent:', error);
+      throw error;
+    }
+  }
+
+  async getAgent(agentId: string): Promise<any> {
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      const agent = await prisma.agent.findUnique({
+        where: { id: agentId },
+      });
+
+      await prisma.$disconnect();
+
+      if (!agent) {
+        return null;
+      }
+
+      return {
+        id: agent.id,
+        name: agent.name,
+        role: agent.role,
+        description: agent.description,
+        model: agent.model,
+        systemPrompt: agent.systemPrompt || '',
+        tools: agent.tools,
+        knowledgePacks: agent.knowledgePackIds,
+        permissions: {
+          network: false,
+          filesystem: true,
+          tools: agent.tools,
+        },
+        authorizations: agent.authorizations,
+        createdAt: agent.createdAt.toISOString(),
+        updatedAt: agent.updatedAt.toISOString(),
+      };
+    } catch (error) {
+      logger.error('Failed to get agent:', error);
+      throw error;
+    }
+  }
+
   private async loadAgentsFromDatabase(): Promise<void> {
     try {
       // Importer Prisma
@@ -217,6 +429,7 @@ export class AgentService {
           role: true,
           description: true,
           model: true,
+          systemPrompt: true,
           goals: true,
           tools: true,
           knowledgePackIds: true,
@@ -239,26 +452,27 @@ export class AgentService {
             role: dbAgent.role,
             description: dbAgent.description || '',
             model: dbAgent.model,
+            systemPrompt: dbAgent.systemPrompt || '',
             goals: dbAgent.goals || [],
             tools: dbAgent.tools || [],
             permissions: {
-              network: false,
-              filesystem: true,
+              network: dbAgent.authorizations?.network || false,
+              filesystem: dbAgent.authorizations?.filesystem || true,
               tools: dbAgent.tools || [],
             },
             knowledgePacks: dbAgent.knowledgePackIds || [],
-            style: {
+            style: dbAgent.style || {
               tone: 'professionnel',
               language: 'fr-CA',
             },
-            authorizations: {
+            authorizations: dbAgent.authorizations || {
               network: false,
               filesystem: true,
             },
           };
 
-          // Créer l'agent avec la configuration
-          const agent = this.agentManager.registerAgent(agentConfig);
+          // Créer l'agent avec la configuration et l'ID de la base de données
+          const agent = this.agentManager.registerAgent(agentConfig, dbAgent.id);
           logger.info(`Agent loaded from database: ${dbAgent.name} (${agent.getAgentId()})`);
         } catch (error) {
           logger.error(`Failed to load agent ${dbAgent.name} from database:`, error);

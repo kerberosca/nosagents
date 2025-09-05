@@ -26,12 +26,13 @@ export class AgentManager {
     this.logger = new Logger('AgentManager');
   }
 
-  registerAgent(config: AgentConfig): Agent {
+  registerAgent(config: AgentConfig, agentId?: string): Agent {
     const agent = new Agent(
       config,
       this.modelProvider,
       this.toolRegistry,
-      this.memoryManager
+      this.memoryManager,
+      agentId
     );
 
     this.agents.set(agent.getAgentId(), agent);
@@ -42,6 +43,24 @@ export class AgentManager {
     this.logger.info(`Agent ${config.name} enregistré avec l'ID ${agent.getAgentId()}`);
     
     return agent;
+  }
+
+  unregisterAgent(agentId: string): boolean {
+    const agent = this.agents.get(agentId);
+    if (!agent) {
+      this.logger.warn(`Tentative de désenregistrement d'un agent inexistant: ${agentId}`);
+      return false;
+    }
+
+    // Désenregistrer l'agent du coordinateur
+    this.coordinator.unregisterAgent(agentId);
+    
+    // Supprimer l'agent de la map
+    this.agents.delete(agentId);
+    
+    this.logger.info(`Agent ${agent.getConfig().name} désenregistré (ID: ${agentId})`);
+    
+    return true;
   }
 
   getAgent(agentId: string): Agent | undefined {

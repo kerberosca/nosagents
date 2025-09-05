@@ -141,37 +141,170 @@ export function createAgentsRouter(
     }
   });
 
+  // POST /agents - Créer un nouvel agent
+  router.post('/', async (req: Request, res: Response) => {
+    try {
+      const agentData = req.body;
+      
+      // Validation des données requises
+      if (!agentData.name || !agentData.role || !agentData.description || !agentData.model || !agentData.systemPrompt) {
+        return res.status(400).json({
+          error: 'Missing required fields: name, role, description, model, systemPrompt',
+        });
+      }
+
+      // Créer l'agent via le service
+      const newAgent = await agentService.createAgent(agentData);
+
+      res.status(201).json({
+        success: true,
+        data: newAgent,
+        message: 'Agent created successfully',
+      });
+    } catch (error) {
+      logger.error('Failed to create agent:', error);
+      res.status(500).json({
+        error: 'Failed to create agent',
+        message: (error as Error).message,
+      });
+    }
+  });
+
+  // PUT /agents/:id - Mettre à jour un agent
+  router.put('/:id', async (req: Request, res: Response) => {
+    try {
+      const agentId = req.params.id;
+      const agentData = req.body;
+      
+      if (!agentId) {
+        return res.status(400).json({
+          error: 'Agent ID is required',
+        });
+      }
+
+      // Mettre à jour l'agent via le service
+      const updatedAgent = await agentService.updateAgent(agentId, agentData);
+
+      res.json({
+        success: true,
+        data: updatedAgent,
+        message: 'Agent updated successfully',
+      });
+    } catch (error) {
+      logger.error('Failed to update agent:', error);
+      res.status(500).json({
+        error: 'Failed to update agent',
+        message: (error as Error).message,
+      });
+    }
+  });
+
+  // DELETE /agents/:id - Supprimer un agent
+  router.delete('/:id', async (req: Request, res: Response) => {
+    try {
+      const agentId = req.params.id;
+      
+      if (!agentId) {
+        return res.status(400).json({
+          error: 'Agent ID is required',
+        });
+      }
+
+      // Supprimer l'agent via le service
+      await agentService.deleteAgent(agentId);
+
+      res.json({
+        success: true,
+        message: 'Agent deleted successfully',
+      });
+    } catch (error) {
+      logger.error('Failed to delete agent:', error);
+      res.status(500).json({
+        error: 'Failed to delete agent',
+        message: (error as Error).message,
+      });
+    }
+  });
+
+  // GET /agents/:id - Obtenir un agent spécifique
+  router.get('/:id', async (req: Request, res: Response) => {
+    try {
+      const agentId = req.params.id;
+      
+      if (!agentId) {
+        return res.status(400).json({
+          error: 'Agent ID is required',
+        });
+      }
+
+      // Récupérer l'agent via le service
+      const agent = await agentService.getAgent(agentId);
+
+      if (!agent) {
+        return res.status(404).json({
+          error: 'Agent not found',
+        });
+      }
+
+      res.json({
+        success: true,
+        data: agent,
+      });
+    } catch (error) {
+      logger.error('Failed to get agent:', error);
+      res.status(500).json({
+        error: 'Failed to get agent',
+        message: (error as Error).message,
+      });
+    }
+  });
+
   // GET /agents - Obtenir la liste de tous les agents (DOIT ÊTRE EN DERNIER)
   router.get('/', async (req: Request, res: Response) => {
     try {
-      const stats = await agentService.getAgentStats();
-      
-      // Transformer les stats en format liste d'agents pour l'interface
-      const agents = Object.entries(stats.stats).map(([id, agentData]: [string, any]) => ({
-        id,
-        name: agentData.name,
-        role: agentData.role,
-        description: agentData.description || '',
-        model: agentData.model || 'qwen2.5:7b',
-        // Convertir le nombre d'outils en tableau d'outils
-        tools: Array.isArray(agentData.tools) ? agentData.tools : [
-          'rag.search',
-          'math.evaluate',
-          'system.info',
-          ...(agentData.tools >= 4 ? ['agent.delegate'] : []),
-          ...(agentData.tools >= 5 ? ['workflow.execute'] : [])
-        ].slice(0, agentData.tools || 0),
-        // Convertir le nombre de packs en tableau de noms
-        knowledgePacks: Array.isArray(agentData.knowledgePackIds) ? agentData.knowledgePackIds : 
-          agentData.knowledgePacks > 0 ? ['general'] : [],
-        permissions: {
-          network: false,
-          filesystem: true,
-          tools: Array.isArray(agentData.tools) ? agentData.tools : ['rag.search', 'math.evaluate'],
+      // Lire directement depuis la base de données au lieu de l'AgentManager
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      const dbAgents = await prisma.agent.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          role: true,
+          description: true,
+          model: true,
+          systemPrompt: true,
+          goals: true,
+          tools: true,
+          knowledgePackIds: true,
+          authorizations: true,
+          style: true,
+          createdAt: true,
+          updatedAt: true,
         },
-        authorizations: agentData.authorizations || { network: false, filesystem: true },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      });
+
+      await prisma.$disconnect();
+
+      // Transformer les données de la base en format pour l'interface
+      const agents = dbAgents.map((agent: any) => ({
+        id: agent.id,
+        name: agent.name,
+        role: agent.role,
+        description: agent.description || '',
+        model: agent.model || 'qwen2.5:7b',
+        systemPrompt: agent.systemPrompt || '',
+        tools: agent.tools || [],
+        knowledgePacks: agent.knowledgePackIds || [],
+        permissions: {
+          network: agent.authorizations?.network || false,
+          filesystem: agent.authorizations?.filesystem || true,
+          tools: agent.tools || [],
+        },
+        authorizations: agent.authorizations || { network: false, filesystem: true },
+        createdAt: agent.createdAt.toISOString(),
+        updatedAt: agent.updatedAt.toISOString(),
       }));
 
       res.json({

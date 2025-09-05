@@ -32,9 +32,10 @@ export class Agent {
     config: AgentConfig,
     modelProvider: ModelProvider,
     toolRegistry: ToolRegistry,
-    memoryManager: MemoryManager
+    memoryManager: MemoryManager,
+    agentId?: string
   ) {
-    this.id = uuidv4();
+    this.id = agentId || uuidv4();
     this.config = config;
     this.modelProvider = modelProvider;
     this.toolRegistry = toolRegistry;
@@ -96,8 +97,8 @@ export class Agent {
         model: this.config.model,
         config: {
           model: this.config.model,
-          temperature: 0.7,
-          maxTokens: 1000,
+          temperature: 0.3,
+          maxTokens: 50,
         },
       };
 
@@ -144,6 +145,12 @@ export class Agent {
   }
 
   private buildSystemPrompt(): string {
+    // Si un systemPrompt personnalisé existe, l'utiliser
+    if (this.config.systemPrompt && this.config.systemPrompt.trim()) {
+      return this.config.systemPrompt;
+    }
+    
+    // Sinon, utiliser le prompt générique
     return `Tu es ${this.config.name}, ${this.config.role}.
 
 Objectifs:

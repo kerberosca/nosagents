@@ -20,6 +20,7 @@ model Agent {
   role        String
   description String?
   model       String   @default("qwen2.5:7b")
+  systemPrompt String? // Custom system prompt for the agent
   goals       String[] // Array of goals
   tools       String[] // Array of tool names
   knowledgePackIds String[] // Array of knowledge pack IDs

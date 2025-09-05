@@ -102,8 +102,21 @@ export class OllamaProvider implements ModelProvider {
         prompt,
         system: systemPrompt,
         options: {
-          temperature: request.temperature || 0.7,
-          num_predict: request.maxTokens || 2048,
+          temperature: request.temperature || 0.3,
+          num_predict: request.maxTokens || 50,
+          num_thread: 8,
+          num_ctx: 128,
+          num_gpu: 0,
+          num_batch: 1,
+          repeat_penalty: 1.0,
+          top_k: 10,
+          top_p: 0.9,
+          tfs_z: 1.0,
+          typical_p: 1.0,
+          mirostat: 0,
+          mirostat_eta: 0.1,
+          mirostat_tau: 5.0,
+          penalize_newline: false
         },
       };
 

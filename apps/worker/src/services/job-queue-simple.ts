@@ -4,14 +4,19 @@ import { logger } from '../utils/logger';
 export class SimpleJobQueueService implements IJobQueueService {
   private jobs: Map<string, any> = new Map();
   private config: any;
+  private processors: Map<JobType, (job: any) => Promise<any>> = new Map();
+  private isProcessing: boolean = false;
 
   constructor(config: any) {
     this.config = config;
     logger.info('Simple job queue initialized (no Redis required)');
+    
+    // Démarrer le traitement automatique des jobs
+    this.startJobProcessor();
   }
 
   async addJob(jobRequest: JobRequest): Promise<string> {
-    const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const jobId = jobRequest.id || `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     const job = {
       id: jobId,
@@ -49,9 +54,11 @@ export class SimpleJobQueueService implements IJobQueueService {
       progress: 0,
       status: job.status,
       timestamp: job.timestamp,
+      createdOn: job.timestamp,
       processedOn: job.processedOn,
       finishedOn: job.finishedOn,
       failedReason: job.failedReason,
+      result: job.result, // Ajouter le résultat du job
     };
   }
 
@@ -151,9 +158,62 @@ export class SimpleJobQueueService implements IJobQueueService {
   }
 
   async registerJobProcessor(jobType: JobType, processor: (job: any) => Promise<any>): Promise<void> {
-    // Pour la version simple, on stocke juste le processeur
-    // mais on ne l'utilise pas automatiquement
+    this.processors.set(jobType, processor);
     logger.info(`Job processor registered for type: ${jobType}`);
+  }
+
+  private startJobProcessor(): void {
+    // Traiter les jobs toutes les 2 secondes
+    setInterval(async () => {
+      if (this.isProcessing) return;
+      
+      this.isProcessing = true;
+      try {
+        await this.processPendingJobs();
+      } catch (error) {
+        logger.error('Error processing jobs:', error);
+      } finally {
+        this.isProcessing = false;
+      }
+    }, 2000);
+    
+    logger.info('Job processor started (checking every 2 seconds)');
+  }
+
+  private async processPendingJobs(): Promise<void> {
+    const pendingJobs = Array.from(this.jobs.values())
+      .filter(job => job.status === JobStatus.PENDING)
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+    for (const job of pendingJobs) {
+      const processor = this.processors.get(job.type);
+      if (processor) {
+        try {
+          logger.info(`Processing job: ${job.id} (${job.type})`);
+          job.status = JobStatus.RUNNING;
+          
+          const result = await processor(job);
+          
+          job.status = JobStatus.COMPLETED;
+          job.result = result;
+          job.finishedOn = new Date();
+          
+          logger.info(`Job completed: ${job.id}`, { result });
+        } catch (error) {
+          job.status = JobStatus.FAILED;
+          job.failedReason = error instanceof Error ? error.message : String(error);
+          job.finishedOn = new Date();
+          
+          logger.error(`Job failed: ${job.id}`, { 
+            error: job.failedReason,
+            stack: error instanceof Error ? error.stack : undefined,
+            fullError: error
+          });
+        }
+      } else {
+        logger.warn(`No processor found for job type: ${job.type}`);
+      }
+    }
   }
 
   async processJob(jobType: JobType, jobId: string, processor: (job: any) => Promise<any>): Promise<any> {

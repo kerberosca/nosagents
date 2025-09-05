@@ -50,6 +50,18 @@ export class Coordinator {
     this.logger.info(`Agent ${agent.getConfig().name} enregistré dans le coordinateur`);
   }
 
+  unregisterAgent(agentId: string): boolean {
+    const agent = this.agents.get(agentId);
+    if (!agent) {
+      this.logger.warn(`Tentative de désenregistrement d'un agent inexistant dans le coordinateur: ${agentId}`);
+      return false;
+    }
+
+    this.agents.delete(agentId);
+    this.logger.info(`Agent ${agent.getConfig().name} désenregistré du coordinateur (ID: ${agentId})`);
+    return true;
+  }
+
   async delegateTask(
     fromAgentId: string,
     toAgentId: string,

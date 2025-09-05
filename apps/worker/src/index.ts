@@ -119,8 +119,8 @@ class WorkerApp {
     // Compression
     this.app.use(compression());
 
-    // Rate limiting
-    if (process.env.ENABLE_RATE_LIMIT !== 'false') {
+    // Rate limiting (désactivé pour les tests)
+    if (process.env.ENABLE_RATE_LIMIT !== 'false' && process.env.NODE_ENV !== 'development') {
       const limiter = rateLimit({
         windowMs: parseInt(process.env.RATE_LIMIT_WINDOW || '900000'), // 15 minutes
         max: parseInt(process.env.RATE_LIMIT_MAX || '100'), // limite par IP

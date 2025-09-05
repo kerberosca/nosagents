@@ -88,32 +88,163 @@ export function ChatInterface() {
     const currentInput = inputValue
     setInputValue('')
 
+    // Ajouter un message "En train de réfléchir..."
+    const thinkingMessage: LocalMessage = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: 'En train de réfléchir...',
+      agent: selectedAgent.name,
+      timestamp: new Date(),
+    }
+    setLocalMessages(prev => [...prev, thinkingMessage])
+
     try {
-      // Utiliser le hook de chat pour envoyer le message
-      await sendMessage(selectedAgent.id, currentInput)
-      
-      // Ajouter la réponse de l'agent aux messages locaux
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage && lastMessage.type === 'agent') {
-        const agentMessage: LocalMessage = {
-          id: (Date.now() + 1).toString(),
-          type: 'assistant',
-          content: lastMessage.content,
-          agent: selectedAgent.name,
-          timestamp: new Date(),
+      // Appeler directement l'API au lieu d'utiliser le hook useChat
+      const response = await fetch('http://localhost:3001/api/agents/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agentId: selectedAgent.id,
+          message: currentInput,
+          sessionId: `chat-session-${Date.now()}`,
+          context: {
+            timestamp: new Date().toISOString()
+          }
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Réponse API:', result)
+
+        // Mettre à jour le message "En train de réfléchir..." avec le job ID
+        setLocalMessages(prev => prev.map(msg =>
+          msg.id === thinkingMessage.id
+            ? {
+                ...msg,
+                content: `Traitement en cours... Job ID: ${result.jobId}`,
+                type: 'assistant' as const
+              }
+            : msg
+        ))
+
+        // Attendre la réponse de l'agent avec timeout de 30 secondes
+        const jobId = result.jobId
+        let attempts = 0
+        const maxAttempts = 30 // 30 secondes
+
+        while (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000)) // Attendre 1 seconde
+          attempts++
+
+          try {
+            const jobResponse = await fetch(`http://localhost:3001/api/jobs/agent_execution/${jobId}`)
+            if (jobResponse.ok) {
+              const jobResult = await jobResponse.json()
+              if (jobResult.success && jobResult.job) {
+                const job = jobResult.job
+                console.log(`État du job (${attempts}s):`, job.status)
+
+                if (job.status === 'completed') {
+                  // Remplacer le message par la réponse de l'agent
+                  let responseContent = 'Réponse reçue mais vide';
+                  
+                  if (job.result) {
+                    // Fonction pour extraire le texte du stream Ollama
+                    const extractTextFromOllamaStream = (streamContent: string) => {
+                      try {
+                        const lines = streamContent.split('\n').filter(line => line.trim());
+                        let extractedText = '';
+                        
+                        for (const line of lines) {
+                          try {
+                            const parsed = JSON.parse(line);
+                            if (parsed.response && typeof parsed.response === 'string') {
+                              extractedText += parsed.response;
+                            }
+                          } catch (e) {
+                            continue;
+                          }
+                        }
+                        
+                        return extractedText.trim();
+                      } catch (error) {
+                        return streamContent;
+                      }
+                    };
+                    
+                    if (job.result.response && job.result.response.content) {
+                      if (typeof job.result.response.content === 'string' && (job.result.response.content.includes('"model":"tinyllama"') || job.result.response.content.includes('"model":"phi3:mini"'))) {
+                        // C'est un stream Ollama, extraire le texte
+                        responseContent = extractTextFromOllamaStream(job.result.response.content);
+                      } else {
+                        responseContent = job.result.response.content;
+                      }
+                    } else if (typeof job.result === 'string') {
+                      responseContent = job.result;
+                    } else {
+                      responseContent = JSON.stringify(job.result, null, 2);
+                    }
+                  }
+                  
+                  setLocalMessages(prev => prev.map(msg =>
+                    msg.id === thinkingMessage.id
+                      ? {
+                          ...msg,
+                          content: responseContent,
+                          type: 'assistant' as const
+                        }
+                      : msg
+                  ))
+                  return // Sortir de la fonction
+                } else if (job.status === 'failed') {
+                  // Afficher l'erreur
+                  setLocalMessages(prev => prev.map(msg =>
+                    msg.id === thinkingMessage.id
+                      ? {
+                          ...msg,
+                          content: `Erreur: ${job.failedReason || 'Job échoué'}`,
+                          type: 'error' as const
+                        }
+                      : msg
+                  ))
+                  return
+                }
+              }
+            }
+          } catch (jobError) {
+            console.log(`Erreur lors de la vérification du job (${attempts}s):`, jobError)
+          }
         }
-        setLocalMessages(prev => [...prev, agentMessage])
+
+        // Si l'API des jobs ne fonctionne pas, afficher un message d'information
+        setLocalMessages(prev => prev.map(msg =>
+          msg.id === thinkingMessage.id
+            ? {
+                ...msg,
+                content: `✅ Message envoyé avec succès ! Job ID: ${jobId}\n\nL'agent a probablement répondu (vérifiez les logs du worker).\nL'API de récupération des jobs ne fonctionne pas actuellement.`,
+                type: 'assistant' as const
+              }
+            : msg
+        ))
+      } else {
+        throw new Error(`Erreur HTTP: ${response.status}`)
       }
     } catch (err) {
       setError((err as Error).message)
-      const errorMessage: LocalMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'error',
-        content: (err as Error).message,
-        agent: 'Système',
-        timestamp: new Date(),
-      }
-      setLocalMessages(prev => [...prev, errorMessage])
+
+      // Remplacer le message "En train de réfléchir..." par l'erreur
+      setLocalMessages(prev => prev.map(msg =>
+        msg.id === thinkingMessage.id
+          ? {
+              ...msg,
+              content: `Erreur: ${(err as Error).message}`,
+              type: 'error' as const
+            }
+          : msg
+      ))
     }
   }
 
@@ -290,9 +421,60 @@ export function ChatInterface() {
                     }`}
                   >
                     <div className="text-sm font-medium mb-1">
-                      {message.agent}
+                      {typeof message.agent === 'string' ? message.agent : 'Agent'}
                     </div>
-                    <div className="text-sm">{message.content}</div>
+                    <div className="text-sm">
+                      {(() => {
+                        if (typeof message.content === 'string') {
+                          return message.content;
+                        }
+                        
+                        // Si c'est un objet, essayer d'extraire le contenu
+                        if (message.content && typeof message.content === 'object') {
+                          const contentObj = message.content as any;
+                          
+                          // Fonction pour extraire le texte du stream Ollama
+                          const extractTextFromOllamaStream = (streamContent: string) => {
+                            try {
+                              const lines = streamContent.split('\n').filter(line => line.trim());
+                              let extractedText = '';
+                              
+                              for (const line of lines) {
+                                try {
+                                  const parsed = JSON.parse(line);
+                                  if (parsed.response && typeof parsed.response === 'string') {
+                                    extractedText += parsed.response;
+                                  }
+                                } catch (e) {
+                                  continue;
+                                }
+                              }
+                              
+                              return extractedText.trim();
+                            } catch (error) {
+                              return streamContent;
+                            }
+                          };
+                          
+                          // Si c'est une réponse d'agent avec une propriété content
+                          if (contentObj.content) {
+                            if (typeof contentObj.content === 'string' && (contentObj.content.includes('"model":"tinyllama"') || contentObj.content.includes('"model":"phi3:mini"'))) {
+                              // C'est un stream Ollama, extraire le texte
+                              return extractTextFromOllamaStream(contentObj.content);
+                            }
+                            return contentObj.content;
+                          }
+                          // Si c'est une réponse d'agent avec une propriété response
+                          if (contentObj.response) {
+                            return contentObj.response;
+                          }
+                          // Sinon, afficher l'objet formaté
+                          return JSON.stringify(message.content, null, 2);
+                        }
+                        
+                        return String(message.content);
+                      })()}
+                    </div>
                     <div className="text-xs opacity-70 mt-2">
                       {message.timestamp.toLocaleTimeString()}
                     </div>
