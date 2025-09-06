@@ -88,8 +88,14 @@ export class SimpleJobQueueService implements IJobQueueService {
         id: job.id,
         type: job.type,
         status: job.status,
-        timestamp: job.timestamp,
+        data: job.data,
+        result: job.result,
+        error: job.failedReason,
+        progress: job.progress,
+        createdAt: job.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: job.finishedOn?.toISOString() || job.createdAt?.toISOString() || new Date().toISOString(),
         priority: job.priority,
+        retries: job.retries,
       }));
   }
 

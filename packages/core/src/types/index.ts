@@ -8,6 +8,7 @@ export interface Agent {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  systemPrompt?: string;
   permissions: {
     network: boolean;
     filesystem: boolean;

@@ -7,6 +7,7 @@ import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import { AlertCircle, Send, Bot } from 'lucide-react'
 import { useChat, useAgents } from '../../lib/hooks'
+import { apiClient } from '../../lib/api'
 import type { Agent, AgentMessage } from '../../lib/types'
 
 interface LocalMessage {
@@ -119,21 +120,46 @@ export function ChatInterface() {
         const result = await response.json()
         console.log('Réponse API:', result)
 
-        // Mettre à jour le message "En train de réfléchir..." avec le job ID
+        // Attendre la réponse de l'agent avec timeout configurable
+        const jobId = result.jobId
+        let attempts = 0
+        
+        // Logique de priorité pour le timeout :
+        // 1. Timeout spécifique à l'agent (priorité haute)
+        // 2. Timeout global (priorité moyenne) 
+        // 3. Timeout par défaut (fallback)
+        const getChatTimeout = async () => {
+          if (selectedAgent?.chatTimeout) {
+            return selectedAgent.chatTimeout;
+          }
+          
+          try {
+            // Récupérer le timeout global depuis l'API
+            const response = await apiClient.getSystemConfigSection('performance');
+            if (response.success && response.data?.chatTimeout) {
+              return response.data.chatTimeout;
+            }
+          } catch (error) {
+            console.warn('Impossible de récupérer le timeout global, utilisation de la valeur par défaut:', error);
+          }
+          
+          return 120000; // 2 minutes par défaut
+        };
+        
+        const timeoutMs = await getChatTimeout();
+        const maxAttempts = Math.ceil(timeoutMs / 1000); // Convertir en secondes
+        const timeoutSeconds = Math.ceil(timeoutMs / 1000);
+
+        // Mettre à jour le message "En train de réfléchir..." avec le job ID et timeout
         setLocalMessages(prev => prev.map(msg =>
           msg.id === thinkingMessage.id
             ? {
                 ...msg,
-                content: `Traitement en cours... Job ID: ${result.jobId}`,
+                content: `Traitement en cours... Job ID: ${result.jobId}\nTimeout: ${timeoutSeconds}s`,
                 type: 'assistant' as const
               }
             : msg
         ))
-
-        // Attendre la réponse de l'agent avec timeout de 30 secondes
-        const jobId = result.jobId
-        let attempts = 0
-        const maxAttempts = 30 // 30 secondes
 
         while (attempts < maxAttempts) {
           await new Promise(resolve => setTimeout(resolve, 1000)) // Attendre 1 seconde
@@ -155,35 +181,98 @@ export function ChatInterface() {
                     // Fonction pour extraire le texte du stream Ollama
                     const extractTextFromOllamaStream = (streamContent: string) => {
                       try {
-                        const lines = streamContent.split('\n').filter(line => line.trim());
+                        console.log('Contenu brut reçu:', streamContent.substring(0, 200) + '...');
                         let extractedText = '';
                         
-                        for (const line of lines) {
-                          try {
-                            const parsed = JSON.parse(line);
-                            if (parsed.response && typeof parsed.response === 'string') {
-                              extractedText += parsed.response;
+                        // Méthode plus robuste pour parser les objets JSON concaténés
+                        // On cherche tous les objets JSON qui contiennent "response"
+                        let currentPos = 0;
+                        const content = streamContent;
+                        
+                        while (currentPos < content.length) {
+                          // Trouver le prochain {
+                          const startBrace = content.indexOf('{', currentPos);
+                          if (startBrace === -1) break;
+                          
+                          // Trouver la fin de cet objet JSON
+                          let braceCount = 0;
+                          let endPos = startBrace;
+                          let inString = false;
+                          let escapeNext = false;
+                          
+                          for (let i = startBrace; i < content.length; i++) {
+                            const char = content[i];
+                            
+                            if (escapeNext) {
+                              escapeNext = false;
+                              continue;
                             }
-                          } catch (e) {
-                            continue;
+                            
+                            if (char === '\\') {
+                              escapeNext = true;
+                              continue;
+                            }
+                            
+                            if (char === '"' && !escapeNext) {
+                              inString = !inString;
+                              continue;
+                            }
+                            
+                            if (!inString) {
+                              if (char === '{') {
+                                braceCount++;
+                              } else if (char === '}') {
+                                braceCount--;
+                                if (braceCount === 0) {
+                                  endPos = i + 1;
+                                  break;
+                                }
+                              }
+                            }
+                          }
+                          
+                          if (braceCount === 0) {
+                            const jsonStr = content.substring(startBrace, endPos);
+                            try {
+                              const parsed = JSON.parse(jsonStr);
+                              if (parsed.response && typeof parsed.response === 'string') {
+                                extractedText += parsed.response;
+                              }
+                            } catch (e) {
+                              // Ignorer les objets JSON malformés
+                            }
+                            currentPos = endPos;
+                          } else {
+                            // Objet JSON incomplet, arrêter
+                            break;
                           }
                         }
                         
-                        return extractedText.trim();
+                        const result = extractedText.trim();
+                        console.log('Texte extrait:', result);
+                        return result || 'Réponse vide reçue';
                       } catch (error) {
-                        return streamContent;
+                        console.error('Erreur extraction texte Ollama:', error);
+                        return 'Erreur lors du traitement de la réponse';
                       }
                     };
                     
                     if (job.result.response && job.result.response.content) {
-                      if (typeof job.result.response.content === 'string' && (job.result.response.content.includes('"model":"tinyllama"') || job.result.response.content.includes('"model":"phi3:mini"'))) {
+                      if (typeof job.result.response.content === 'string' && (job.result.response.content.includes('"model":"tinyllama') || job.result.response.content.includes('"model":"phi3:mini'))) {
                         // C'est un stream Ollama, extraire le texte
+                        console.log('Détection stream Ollama - extraction du texte...');
                         responseContent = extractTextFromOllamaStream(job.result.response.content);
                       } else {
                         responseContent = job.result.response.content;
                       }
                     } else if (typeof job.result === 'string') {
-                      responseContent = job.result;
+                      // Vérifier si c'est un stream Ollama même si c'est directement dans job.result
+                      if (job.result.includes('"model":"tinyllama') || job.result.includes('"model":"phi3:mini')) {
+                        console.log('Détection stream Ollama dans job.result - extraction du texte...');
+                        responseContent = extractTextFromOllamaStream(job.result);
+                      } else {
+                        responseContent = job.result;
+                      }
                     } else {
                       responseContent = JSON.stringify(job.result, null, 2);
                     }
@@ -436,29 +525,81 @@ export function ChatInterface() {
                           // Fonction pour extraire le texte du stream Ollama
                           const extractTextFromOllamaStream = (streamContent: string) => {
                             try {
-                              const lines = streamContent.split('\n').filter(line => line.trim());
                               let extractedText = '';
                               
-                              for (const line of lines) {
-                                try {
-                                  const parsed = JSON.parse(line);
-                                  if (parsed.response && typeof parsed.response === 'string') {
-                                    extractedText += parsed.response;
+                              // Méthode plus robuste pour parser les objets JSON concaténés
+                              let currentPos = 0;
+                              const content = streamContent;
+                              
+                              while (currentPos < content.length) {
+                                // Trouver le prochain {
+                                const startBrace = content.indexOf('{', currentPos);
+                                if (startBrace === -1) break;
+                                
+                                // Trouver la fin de cet objet JSON
+                                let braceCount = 0;
+                                let endPos = startBrace;
+                                let inString = false;
+                                let escapeNext = false;
+                                
+                                for (let i = startBrace; i < content.length; i++) {
+                                  const char = content[i];
+                                  
+                                  if (escapeNext) {
+                                    escapeNext = false;
+                                    continue;
                                   }
-                                } catch (e) {
-                                  continue;
+                                  
+                                  if (char === '\\') {
+                                    escapeNext = true;
+                                    continue;
+                                  }
+                                  
+                                  if (char === '"' && !escapeNext) {
+                                    inString = !inString;
+                                    continue;
+                                  }
+                                  
+                                  if (!inString) {
+                                    if (char === '{') {
+                                      braceCount++;
+                                    } else if (char === '}') {
+                                      braceCount--;
+                                      if (braceCount === 0) {
+                                        endPos = i + 1;
+                                        break;
+                                      }
+                                    }
+                                  }
+                                }
+                                
+                                if (braceCount === 0) {
+                                  const jsonStr = content.substring(startBrace, endPos);
+                                  try {
+                                    const parsed = JSON.parse(jsonStr);
+                                    if (parsed.response && typeof parsed.response === 'string') {
+                                      extractedText += parsed.response;
+                                    }
+                                  } catch (e) {
+                                    // Ignorer les objets JSON malformés
+                                  }
+                                  currentPos = endPos;
+                                } else {
+                                  // Objet JSON incomplet, arrêter
+                                  break;
                                 }
                               }
                               
-                              return extractedText.trim();
+                              return extractedText.trim() || 'Réponse vide reçue';
                             } catch (error) {
-                              return streamContent;
+                              console.error('Erreur extraction texte Ollama:', error);
+                              return 'Erreur lors du traitement de la réponse';
                             }
                           };
                           
                           // Si c'est une réponse d'agent avec une propriété content
                           if (contentObj.content) {
-                            if (typeof contentObj.content === 'string' && (contentObj.content.includes('"model":"tinyllama"') || contentObj.content.includes('"model":"phi3:mini"'))) {
+                            if (typeof contentObj.content === 'string' && (contentObj.content.includes('"model":"tinyllama') || contentObj.content.includes('"model":"phi3:mini'))) {
                               // C'est un stream Ollama, extraire le texte
                               return extractTextFromOllamaStream(contentObj.content);
                             }

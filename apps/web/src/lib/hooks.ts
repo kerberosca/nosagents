@@ -94,10 +94,45 @@ export function useJobs() {
     try {
       const response = await apiClient.getQueueStats();
       if (response.success) {
-        setStats(response.stats || response.data);
+        const rawStats = response.stats || response.data;
+        
+        // Transformer les statistiques pour correspondre au format attendu par l'interface
+        const transformedStats = {
+          totalJobs: rawStats.totalJobs || 0,
+          pendingJobs: rawStats.byStatus?.pending || 0,
+          runningJobs: rawStats.byStatus?.running || 0,
+          completedJobs: rawStats.byStatus?.completed || 0,
+          failedJobs: rawStats.byStatus?.failed || 0,
+          cancelledJobs: rawStats.byStatus?.cancelled || 0,
+          averageProcessingTime: rawStats.averageProcessingTime || 0,
+          byType: rawStats.byType || {}
+        };
+        
+        setStats(transformedStats);
       }
     } catch (err) {
       console.error('Erreur lors de la récupération des stats:', err);
+    }
+  }, []);
+
+  const getJobsList = useCallback(async (type?: string, status?: string, limit?: number) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiClient.getJobs(type, status, limit);
+      if (response.success && response.data) {
+        setJobs(response.data);
+        return response.data;
+      } else {
+        setError(response.error || 'Erreur lors de la récupération des jobs');
+        return [];
+      }
+    } catch (err) {
+      setError((err as Error).message);
+      return [];
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -123,6 +158,7 @@ export function useJobs() {
     getJob,
     cancelJob,
     getStats,
+    getJobsList,
   };
 }
 

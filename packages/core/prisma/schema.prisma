@@ -251,6 +251,19 @@ model WorkflowParticipant {
 // SYSTEM & LOGS
 // ========================================
 
+model SystemConfig {
+  id          String   @id @default("system") // Single row with fixed ID
+  ollama      Json     // Ollama configuration
+  database    Json     // Database configuration
+  security    Json     // Security settings
+  performance Json     // Performance settings
+  logging     Json     // Logging configuration
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_config")
+}
+
 model SystemLog {
   id        String   @id @default(cuid())
   level     String   // info, warn, error, debug

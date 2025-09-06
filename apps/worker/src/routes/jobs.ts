@@ -165,5 +165,51 @@ export function createJobsRouter(jobQueueService: IJobQueueService): Router {
     }
   });
 
+  // GET /jobs - Obtenir la liste de tous les jobs
+  router.get('/', async (req: Request, res: Response) => {
+    try {
+      const { type, status, limit = '50' } = req.query;
+      
+      let jobs: any[] = [];
+      
+      if (type && Object.values(JobType).includes(type as JobType)) {
+        // Récupérer les jobs d'un type spécifique
+        jobs = await jobQueueService.getJobsByType(type as JobType);
+      } else {
+        // Récupérer tous les jobs (nécessite une nouvelle méthode dans le service)
+        // Pour l'instant, on récupère les jobs de chaque type
+        const allJobTypes = Object.values(JobType);
+        for (const jobType of allJobTypes) {
+          const typeJobs = await jobQueueService.getJobsByType(jobType);
+          jobs = jobs.concat(typeJobs);
+        }
+      }
+      
+      // Filtrer par statut si spécifié
+      if (status) {
+        jobs = jobs.filter(job => job.status === status);
+      }
+      
+      // Limiter le nombre de résultats
+      const limitNum = parseInt(limit as string);
+      jobs = jobs.slice(0, limitNum);
+      
+      // Trier par date de création (plus récents en premier)
+      jobs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      res.json({
+        success: true,
+        data: jobs,
+        total: jobs.length,
+      });
+    } catch (error) {
+      logger.error('Failed to get jobs list:', error);
+      res.status(500).json({
+        error: 'Failed to get jobs list',
+        message: (error as Error).message,
+      });
+    }
+  });
+
   return router;
 }

@@ -15,6 +15,7 @@ import { databaseService } from './services/database-service';
 import { createJobsRouter } from './routes/jobs';
 import { createAgentsRouter } from './routes/agents';
 import { createRAGRouter } from './routes/rag';
+import systemConfigRouter from './routes/system-config';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { logger } from './utils/logger';
 import { JobType, IJobQueueService } from './types';
@@ -171,6 +172,7 @@ class WorkerApp {
     this.app.use('/api/jobs', createJobsRouter(this.jobQueueService));
     this.app.use('/api/agents', createAgentsRouter(this.agentService, this.jobQueueService));
     this.app.use('/api/rag', createRAGRouter(this.ragService, this.jobQueueService));
+    this.app.use('/api/system-config', systemConfigRouter);
     
     // Route de test de la base de données
     this.app.get('/api/database/test', async (req, res) => {

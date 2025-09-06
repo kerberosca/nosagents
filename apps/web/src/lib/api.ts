@@ -11,7 +11,8 @@ import type {
   CreateAgentRequest,
   UpdateAgentRequest,
   RAGSearchRequest,
-  RAGIndexRequest
+  RAGIndexRequest,
+  SystemConfig
 } from './types';
 
 // Ré-exporter les types pour compatibilité
@@ -24,7 +25,8 @@ export type {
   CreateAgentRequest,
   UpdateAgentRequest,
   RAGSearchRequest,
-  RAGIndexRequest
+  RAGIndexRequest,
+  SystemConfig
 };
 
 // Classe pour gérer les appels API
@@ -84,6 +86,18 @@ class ApiClient {
 
   async getQueueStats(): Promise<ApiResponse<any>> {
     return this.request<any>('/api/jobs/stats');
+  }
+
+  async getJobs(type?: string, status?: string, limit?: number): Promise<ApiResponse<any[]>> {
+    const params = new URLSearchParams();
+    if (type) params.append('type', type);
+    if (status) params.append('status', status);
+    if (limit) params.append('limit', limit.toString());
+    
+    const queryString = params.toString();
+    const endpoint = queryString ? `/api/jobs?${queryString}` : '/api/jobs';
+    
+    return this.request<any[]>(endpoint);
   }
 
   // Agents API
@@ -186,6 +200,38 @@ class ApiClient {
       method: 'POST',
     });
   }
+
+  // ========================================
+  // SYSTEM CONFIG API
+  // ========================================
+
+  async getSystemConfig(): Promise<ApiResponse<SystemConfig>> {
+    return this.request<SystemConfig>('/api/system-config');
+  }
+
+  async updateSystemConfig(config: Partial<SystemConfig>): Promise<ApiResponse<SystemConfig>> {
+    return this.request<SystemConfig>('/api/system-config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async getSystemConfigSection(section: keyof SystemConfig): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/system-config/${section}`);
+  }
+
+  async updateSystemConfigSection(section: keyof SystemConfig, updates: any): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/system-config/${section}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async resetSystemConfig(): Promise<ApiResponse<SystemConfig>> {
+    return this.request<SystemConfig>('/api/system-config/reset', {
+      method: 'POST',
+    });
+  }
 }
 
 // Instance singleton
@@ -220,6 +266,13 @@ export const useApi = () => {
       getExtensions: apiClient.getSupportedExtensions.bind(apiClient),
       deleteDocument: apiClient.deleteDocument.bind(apiClient),
       clear: apiClient.clearRAGIndex.bind(apiClient),
+    },
+    systemConfig: {
+      get: apiClient.getSystemConfig.bind(apiClient),
+      update: apiClient.updateSystemConfig.bind(apiClient),
+      getSection: apiClient.getSystemConfigSection.bind(apiClient),
+      updateSection: apiClient.updateSystemConfigSection.bind(apiClient),
+      reset: apiClient.resetSystemConfig.bind(apiClient),
     },
   };
 };

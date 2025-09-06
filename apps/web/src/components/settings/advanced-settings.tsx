@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import { Textarea } from '../ui/textarea'
 import { Switch } from '../ui/switch'
 import { Badge } from '../ui/badge'
 import { 
@@ -20,50 +19,12 @@ import {
   Settings,
   AlertTriangle,
   CheckCircle,
-  XCircle
+  XCircle,
+  Clock
 } from 'lucide-react'
+import { apiClient } from '../../lib/api'
+import type { SystemConfig } from '../../lib/types'
 
-interface SystemConfig {
-  ollama: {
-    baseUrl: string
-    defaultModel: string
-    embedModel: string
-    timeout: number
-    maxTokens: number
-    temperature: number
-  }
-  database: {
-    postgresUrl: string
-    redisUrl: string
-    connectionPool: number
-    timeout: number
-  }
-  security: {
-    allowNetwork: boolean
-    allowedDomains: string[]
-    sandboxDir: string
-    maxFileSize: number
-    enableAudit: boolean
-  }
-  performance: {
-    chunkSize: number
-    chunkOverlap: number
-    batchSize: number
-    maxConcurrentJobs: number
-    jobTimeout: number
-    enableRateLimit: boolean
-    rateLimitWindow: number
-    rateLimitMax: number
-  }
-  logging: {
-    level: string
-    enableFileLogging: boolean
-    logDir: string
-    maxLogSize: number
-    maxLogFiles: number
-    enableDebug: boolean
-  }
-}
 
 interface ServiceStatus {
   name: string
@@ -102,6 +63,7 @@ export function AdvancedSettings() {
       batchSize: 10,
       maxConcurrentJobs: 5,
       jobTimeout: 300000, // 5 minutes
+      chatTimeout: 120000, // 2 minutes - NOUVEAU PARAMÈTRE
       enableRateLimit: true,
       rateLimitWindow: 900000, // 15 minutes
       rateLimitMax: 100
@@ -121,8 +83,20 @@ export function AdvancedSettings() {
   const [testing, setTesting] = useState(false)
 
   useEffect(() => {
+    loadSystemConfig()
     loadServiceStatus()
   }, [])
+
+  const loadSystemConfig = async () => {
+    try {
+      const response = await apiClient.getSystemConfig()
+      if (response.success && response.data) {
+        setConfig(response.data)
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement de la configuration système:', error)
+    }
+  }
 
   const loadServiceStatus = async () => {
     // TODO: Charger depuis l'API
@@ -172,9 +146,14 @@ export function AdvancedSettings() {
   const saveConfig = async () => {
     setSaving(true)
     try {
-      // TODO: Appeler l'API pour sauvegarder la configuration
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulation
-      alert('Configuration sauvegardée avec succès !')
+      const response = await apiClient.updateSystemConfig(config)
+      if (response.success) {
+        alert('Configuration sauvegardée avec succès !')
+        // Recharger la configuration pour s'assurer qu'elle est synchronisée
+        await loadSystemConfig()
+      } else {
+        alert(`Erreur lors de la sauvegarde: ${response.error}`)
+      }
     } catch (error) {
       alert('Erreur lors de la sauvegarde de la configuration')
       console.error(error)
@@ -195,6 +174,26 @@ export function AdvancedSettings() {
       console.error(error)
     } finally {
       setTesting(false)
+    }
+  }
+
+  const resetConfig = async () => {
+    if (confirm('Êtes-vous sûr de vouloir réinitialiser la configuration aux valeurs par défaut ?')) {
+      setSaving(true)
+      try {
+        const response = await apiClient.resetSystemConfig()
+        if (response.success && response.data) {
+          setConfig(response.data)
+          alert('Configuration réinitialisée avec succès !')
+        } else {
+          alert(`Erreur lors de la réinitialisation: ${response.error}`)
+        }
+      } catch (error) {
+        alert('Erreur lors de la réinitialisation de la configuration')
+        console.error(error)
+      } finally {
+        setSaving(false)
+      }
     }
   }
 
@@ -264,7 +263,7 @@ export function AdvancedSettings() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Timeout (ms)</Label>
+              <Label>Timeout Ollama (ms)</Label>
               <Input
                 type="number"
                 value={config.ollama.timeout}
@@ -272,6 +271,9 @@ export function AdvancedSettings() {
                 min="5000"
                 max="120000"
               />
+              <p className="text-xs text-muted-foreground">
+                Timeout pour les requêtes vers Ollama (génération de texte)
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Tokens max</Label>
@@ -298,131 +300,7 @@ export function AdvancedSettings() {
         </CardContent>
       </Card>
 
-      {/* Configuration base de données */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Database className="h-5 w-5" />
-            <span>Base de données</span>
-          </CardTitle>
-          <CardDescription>
-            Configuration PostgreSQL et Redis
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>URL PostgreSQL</Label>
-              <Input
-                value={config.database.postgresUrl}
-                onChange={(e) => updateConfig('database', 'postgresUrl', e.target.value)}
-                placeholder="postgresql://user:pass@localhost:5432/db"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>URL Redis</Label>
-              <Input
-                value={config.database.redisUrl}
-                onChange={(e) => updateConfig('database', 'redisUrl', e.target.value)}
-                placeholder="redis://localhost:6379"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Pool de connexions</Label>
-              <Input
-                type="number"
-                value={config.database.connectionPool}
-                onChange={(e) => updateConfig('database', 'connectionPool', parseInt(e.target.value))}
-                min="1"
-                max="50"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Timeout connexion (ms)</Label>
-              <Input
-                type="number"
-                value={config.database.timeout}
-                onChange={(e) => updateConfig('database', 'timeout', parseInt(e.target.value))}
-                min="1000"
-                max="30000"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sécurité */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Shield className="h-5 w-5" />
-            <span>Sécurité</span>
-          </CardTitle>
-          <CardDescription>
-            Paramètres de sécurité et autorisations
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Accès réseau</Label>
-                <p className="text-sm text-muted-foreground">
-                  Autoriser les agents à accéder à Internet
-                </p>
-              </div>
-              <Switch
-                checked={config.security.allowNetwork}
-                onCheckedChange={(checked) => updateConfig('security', 'allowNetwork', checked)}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Audit des actions</Label>
-                <p className="text-sm text-muted-foreground">
-                  Enregistrer toutes les actions des agents
-                </p>
-              </div>
-              <Switch
-                checked={config.security.enableAudit}
-                onCheckedChange={(checked) => updateConfig('security', 'enableAudit', checked)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Domaines autorisés (séparés par des virgules)</Label>
-            <Input
-              value={config.security.allowedDomains.join(', ')}
-              onChange={(e) => updateConfig('security', 'allowedDomains', e.target.value.split(',').map(d => d.trim()))}
-              placeholder="example.com, quebec.ca"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Répertoire sandbox</Label>
-              <Input
-                value={config.security.sandboxDir}
-                onChange={(e) => updateConfig('security', 'sandboxDir', e.target.value)}
-                placeholder="./sandbox"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Taille max fichier (MB)</Label>
-              <Input
-                type="number"
-                value={config.security.maxFileSize / (1024 * 1024)}
-                onChange={(e) => updateConfig('security', 'maxFileSize', parseInt(e.target.value) * 1024 * 1024)}
-                min="1"
-                max="1000"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Performance */}
+      {/* Performance - Section avec le nouveau paramètre chatTimeout */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -475,6 +353,35 @@ export function AdvancedSettings() {
                 max="20"
               />
             </div>
+            <div className="space-y-2">
+              <Label>Timeout des jobs (ms)</Label>
+              <Input
+                type="number"
+                value={config.performance.jobTimeout}
+                onChange={(e) => updateConfig('performance', 'jobTimeout', parseInt(e.target.value))}
+                min="30000"
+                max="600000"
+              />
+              <p className="text-xs text-muted-foreground">
+                Timeout pour l&apos;exécution des jobs en arrière-plan
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center space-x-2">
+                <Clock className="h-4 w-4" />
+                <span>Timeout du chat (ms)</span>
+              </Label>
+              <Input
+                type="number"
+                value={config.performance.chatTimeout}
+                onChange={(e) => updateConfig('performance', 'chatTimeout', parseInt(e.target.value))}
+                min="10000"
+                max="300000"
+              />
+              <p className="text-xs text-muted-foreground">
+                ⭐ Timeout pour attendre la réponse complète de l&apos;agent dans le chat
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
@@ -517,141 +424,6 @@ export function AdvancedSettings() {
         </CardContent>
       </Card>
 
-      {/* Logging */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <HardDrive className="h-5 w-5" />
-            <span>Logging</span>
-          </CardTitle>
-          <CardDescription>
-            Configuration des logs et traces
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Niveau de log</Label>
-              <select
-                value={config.logging.level}
-                onChange={(e) => updateConfig('logging', 'level', e.target.value)}
-                className="w-full p-2 border rounded-md"
-              >
-                <option value="debug">Debug</option>
-                <option value="info">Info</option>
-                <option value="warn">Warning</option>
-                <option value="error">Error</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label>Répertoire des logs</Label>
-              <Input
-                value={config.logging.logDir}
-                onChange={(e) => updateConfig('logging', 'logDir', e.target.value)}
-                placeholder="./logs"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Taille max log (MB)</Label>
-              <Input
-                type="number"
-                value={config.logging.maxLogSize / (1024 * 1024)}
-                onChange={(e) => updateConfig('logging', 'maxLogSize', parseInt(e.target.value) * 1024 * 1024)}
-                min="1"
-                max="100"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Nombre max de fichiers</Label>
-              <Input
-                type="number"
-                value={config.logging.maxLogFiles}
-                onChange={(e) => updateConfig('logging', 'maxLogFiles', parseInt(e.target.value))}
-                min="1"
-                max="20"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>Logs dans fichiers</Label>
-              <p className="text-sm text-muted-foreground">
-                Enregistrer les logs dans des fichiers
-              </p>
-            </div>
-            <Switch
-              checked={config.logging.enableFileLogging}
-              onCheckedChange={(checked) => updateConfig('logging', 'enableFileLogging', checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>Mode debug</Label>
-              <p className="text-sm text-muted-foreground">
-                Activer les logs détaillés
-              </p>
-            </div>
-            <Switch
-              checked={config.logging.enableDebug}
-              onCheckedChange={(checked) => updateConfig('logging', 'enableDebug', checked)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* État des services */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <Network className="h-5 w-5" />
-                <span>État des services</span>
-              </CardTitle>
-              <CardDescription>
-                Statut de santé des composants du système
-              </CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              onClick={testConnections}
-              disabled={testing}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${testing ? 'animate-spin' : ''}`} />
-              Tester les connexions
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {services.map((service) => (
-              <div key={service.name} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(service.status)}
-                  <div>
-                    <div className="font-medium">{service.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {service.details}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <Badge className={getStatusColor(service.status)}>
-                    {service.status === 'healthy' ? 'En ligne' :
-                     service.status === 'degraded' ? 'Dégradé' : 'Hors ligne'}
-                  </Badge>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {service.responseTime}ms
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Actions */}
       <Card>
         <CardHeader>
@@ -667,7 +439,7 @@ export function AdvancedSettings() {
               <RefreshCw className={`h-4 w-4 mr-2 ${testing ? 'animate-spin' : ''}`} />
               {testing ? 'Test en cours...' : 'Tester les connexions'}
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={resetConfig} disabled={saving}>
               Réinitialiser aux valeurs par défaut
             </Button>
           </div>

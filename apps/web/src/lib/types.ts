@@ -15,6 +15,7 @@ export interface Agent {
     tools: string[];
   };
   knowledgePacks: string[];
+  chatTimeout?: number; // Timeout spécifique à l'agent (en ms)
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +33,7 @@ export interface CreateAgentRequest {
     tools: string[];
   };
   knowledgePacks: string[];
+  chatTimeout?: number; // Timeout spécifique à l'agent (en ms)
 }
 
 export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {
@@ -71,6 +73,7 @@ export interface JobRequest {
 
 export interface JobResult {
   id: string;
+  type: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   result?: any;
   error?: string;
@@ -89,6 +92,49 @@ export interface RAGIndexRequest {
   file?: File;
   directory?: string;
   options?: any;
+}
+
+export interface SystemConfig {
+  ollama: {
+    baseUrl: string;
+    defaultModel: string;
+    embedModel: string;
+    timeout: number;
+    maxTokens: number;
+    temperature: number;
+  };
+  database: {
+    postgresUrl: string;
+    redisUrl: string;
+    connectionPool: number;
+    timeout: number;
+  };
+  security: {
+    allowNetwork: boolean;
+    allowedDomains: string[];
+    sandboxDir: string;
+    maxFileSize: number;
+    enableAudit: boolean;
+  };
+  performance: {
+    chunkSize: number;
+    chunkOverlap: number;
+    batchSize: number;
+    maxConcurrentJobs: number;
+    jobTimeout: number;
+    chatTimeout: number;
+    enableRateLimit: boolean;
+    rateLimitWindow: number;
+    rateLimitMax: number;
+  };
+  logging: {
+    level: string;
+    enableFileLogging: boolean;
+    logDir: string;
+    maxLogSize: number;
+    maxLogFiles: number;
+    enableDebug: boolean;
+  };
 }
 
 export interface ApiResponse<T = any> {

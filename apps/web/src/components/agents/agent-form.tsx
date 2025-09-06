@@ -44,6 +44,7 @@ export function AgentForm({
       tools: agent?.permissions?.tools || [],
     },
     knowledgePacks: agent?.knowledgePacks || [],
+    chatTimeout: agent?.chatTimeout || undefined,
   })
 
   const [selectedTool, setSelectedTool] = useState('')
@@ -297,6 +298,24 @@ export function AgentForm({
                 />
               </div>
             </div>
+          </div>
+
+          {/* Configuration du timeout du chat */}
+          <div className="space-y-2">
+            <Label htmlFor="chatTimeout">Timeout du chat (ms)</Label>
+            <Input
+              id="chatTimeout"
+              type="number"
+              value={formData.chatTimeout || ''}
+              onChange={(e) => handleInputChange('chatTimeout', e.target.value ? parseInt(e.target.value) : undefined)}
+              placeholder="120000"
+              min="10000"
+              max="300000"
+            />
+            <p className="text-sm text-muted-foreground">
+              Timeout spécifique pour cet agent (optionnel). Si non défini, utilise le timeout global.
+              Valeur recommandée : 120000ms (2 minutes)
+            </p>
           </div>
 
           {/* Actions */}

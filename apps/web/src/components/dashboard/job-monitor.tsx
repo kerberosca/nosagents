@@ -30,18 +30,20 @@ interface JobStats {
 }
 
 export function JobMonitor() {
-  const { stats, jobs, loading, error, getStats, cancelJob, getJob } = useJobs()
+  const { stats, jobs, loading, error, getStats, getJobsList, cancelJob, getJob } = useJobs()
   const [selectedJobType, setSelectedJobType] = useState<string>('all')
   const [jobDetails, setJobDetails] = useState<JobResult | null>(null)
 
   useEffect(() => {
     getStats()
-  }, [getStats])
+    getJobsList() // Charger la liste des jobs
+  }, [getStats, getJobsList])
 
   const handleCancelJob = async (jobId: string) => {
     if (confirm('Êtes-vous sûr de vouloir annuler ce job ?')) {
       await cancelJob(jobId)
       getStats() // Recharger les stats
+      getJobsList() // Recharger la liste des jobs
     }
   }
 
@@ -188,7 +190,10 @@ export function JobMonitor() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => getStats()}
+              onClick={() => {
+                getStats()
+                getJobsList()
+              }}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               Actualiser
@@ -232,7 +237,7 @@ export function JobMonitor() {
             {/* Liste des jobs */}
             <div className="space-y-2">
               {jobs
-                .filter(job => selectedJobType === 'all' || job.status === selectedJobType)
+                .filter(job => selectedJobType === 'all' || job.type === selectedJobType)
                 .map((job) => (
                   <div
                     key={job.id}
@@ -282,7 +287,7 @@ export function JobMonitor() {
                   </div>
                 ))}
 
-              {jobs.filter(job => selectedJobType === 'all' || job.status === selectedJobType).length === 0 && (
+              {jobs.filter(job => selectedJobType === 'all' || job.type === selectedJobType).length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   Aucun job trouvé pour ce type
                 </div>
